@@ -1,65 +1,236 @@
-import Image from "next/image";
+'use client';
+import React, { useState } from 'react';
+import { User, UserRole, CropInventory, AppRoute } from '@/types';
+import { INITIAL_INVENTORY } from '@/constants';
+import HeatMap from '@/app/components/HeatMap';
+import ChatPortal from '@/app/components/ChatPortal';
+import EscrowPortal from '@/app/components/EscrowPortal';
+import FarmerDashboard from '@/app/components/FarmerDashboard';
 
-export default function Home() {
+const App: React.FC = () => {
+  const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
+  const [user] = useState<User>({
+    id: 'u123',
+    name: 'Wilson Mwangi',
+    role: UserRole.BUYER,
+    location: 'Nakuru'
+  });
+  
+  const [inventory, setInventory] = useState<CropInventory[]>(INITIAL_INVENTORY);
+  const [route, setRoute] = useState<AppRoute>(AppRoute.MARKETPLACE);
+  const [selectedCrop, setSelectedCrop] = useState<CropInventory | null>(null);
+  const [drillDownRegion, setDrillDownRegion] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{show: boolean, type: string} | null>(null);
+
+  const farmersInRegion = drillDownRegion 
+    ? inventory.filter(i => i.location.name === drillDownRegion)
+    : [];
+
+  const handleConnectRequest = (crop: CropInventory) => {
+    setSelectedCrop(crop);
+    setNotification({ show: true, type: 'REQUESTING' });
+    
+    setTimeout(() => {
+      setNotification({ show: true, type: 'ACCEPTED' });
+      setTimeout(() => {
+        setNotification(null);
+        setRoute(AppRoute.NEGOTIATION);
+      }, 1500);
+    }, 2500);
+  };
+
+  const handleAddInventory = (newItem: CropInventory) => {
+    setInventory([newItem, ...inventory]);
+    setUserRole(UserRole.BUYER); 
+    setRoute(AppRoute.MARKETPLACE);
+    setNotification({ show: true, type: 'ACCEPTED' });
+    setTimeout(() => setNotification(null), 2000);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex flex-col h-screen w-screen bg-gray-50 font-sans overflow-hidden">
+      {/* Uber-style Toast Notification */}
+      {notification?.show && (
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-sm px-6">
+          <div className="bg-black text-white p-5 rounded-3xl shadow-2xl flex items-center space-x-4 border border-gray-800 animate-bounce">
+            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center relative">
+              <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-25"></div>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div>
+              <p className="font-black text-sm uppercase tracking-tight">
+                {notification.type === 'REQUESTING' ? 'Requesting Connection...' : 'Status Updated!'}
+              </p>
+              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
+                {notification.type === 'REQUESTING' ? 'Connecting to Hub...' : 'Live on Marketplace'}
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      )}
+
+      {/* Global Navbar */}
+      <nav className="bg-black text-white px-8 py-5 flex justify-between items-center z-[60] shadow-2xl shrink-0">
+        <div className="flex items-center space-x-4 cursor-pointer" onClick={() => {setRoute(AppRoute.MARKETPLACE); setDrillDownRegion(null);}}>
+          <div className="bg-white text-black px-2.5 py-1 rounded-md font-black text-2xl italic tracking-tighter shadow-lg">S</div>
+          <div>
+            <span className="text-2xl font-black tracking-tighter">Shumber</span>
+            <p className="text-[9px] text-green-500 font-black uppercase tracking-[0.2em] leading-none">Uber for harvests</p>
+          </div>
         </div>
-      </main>
+        
+        <div className="flex items-center space-x-6">
+          <button 
+            onClick={() => setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER)}
+            className="bg-gray-800 hover:bg-gray-700 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-gray-700 transition-colors"
+          >
+            Switch to {userRole === UserRole.BUYER ? 'Farmer' : 'Buyer'} View
+          </button>
+          <div className="h-10 w-10 rounded-full border-2 border-green-800 overflow-hidden shadow-inner">
+             <img src={`https://ui-avatars.com/api/?name=${user.name}&background=000&color=fff&bold=true`} alt="User" />
+          </div>
+        </div>
+      </nav>
+
+      <div className="flex-1 relative flex flex-col overflow-hidden">
+        {userRole === UserRole.FARMER ? (
+          <div className="flex-1 overflow-y-auto">
+            <FarmerDashboard user={{...user, role: UserRole.FARMER}} onAddInventory={handleAddInventory} />
+          </div>
+        ) : (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {route === AppRoute.MARKETPLACE && (
+              <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+                {/* Map Container - Important: set relative and flex-1 */}
+                <div className="flex-1 relative bg-gray-200 min-h-[40vh] lg:min-h-full overflow-hidden">
+                  <HeatMap 
+                    inventory={inventory} 
+                    onSelectCrop={setSelectedCrop} 
+                    onRegionSelect={setDrillDownRegion} 
+                  />
+                  <div className="absolute top-6 left-6 z-[40]">
+                    <div className="bg-white px-5 py-2.5 rounded-full shadow-2xl border border-gray-100 flex items-center space-x-3">
+                       <div className="w-2.5 h-2.5 bg-black rounded-full animate-pulse"></div>
+                       <span className="text-[11px] font-black uppercase tracking-widest">Live Surplus Hubs</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full lg:w-[400px] bg-white border-l border-gray-100 overflow-y-auto p-8 space-y-8 shadow-2xl z-50 shrink-0">
+                  {drillDownRegion ? (
+                    <div className="animate-slideInRight">
+                      <div className="flex items-center justify-between mb-6">
+                        <div>
+                          <h2 className="text-3xl font-black tracking-tighter">{drillDownRegion} Hub</h2>
+                          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Available Pickups</p>
+                        </div>
+                        <button onClick={() => setDrillDownRegion(null)} className="text-xs font-black text-gray-300 hover:text-black transition-colors">BACK</button>
+                      </div>
+                      <div className="space-y-4">
+                        {farmersInRegion.map(item => (
+                          <div 
+                            key={item.id}
+                            onClick={() => setSelectedCrop(item)}
+                            className={`p-5 rounded-3xl border-2 transition-all cursor-pointer ${selectedCrop?.id === item.id ? 'border-black bg-gray-50 shadow-xl scale-[1.02]' : 'border-gray-50 hover:border-gray-200'}`}
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <h4 className="font-black text-lg">{item.farmerName}</h4>
+                              <span className="bg-green-100 text-green-800 text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-tighter">{item.qualityScore}% QA</span>
+                            </div>
+                            <p className="text-sm font-medium text-gray-500 mb-4">{item.cropName}</p>
+                            <div className="flex justify-between items-end">
+                              <div>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Market Price</p>
+                                <p className="text-2xl font-black">KES {item.currentBid}<span className="text-xs font-bold text-gray-400 ml-1">/Kg</span></p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : selectedCrop ? (
+                    <div className="animate-fadeIn">
+                       <div className="mb-8">
+                         <h2 className="text-4xl font-black tracking-tighter mb-1">{selectedCrop.cropName}</h2>
+                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{selectedCrop.farmerName} • Verified Origin</p>
+                       </div>
+                       
+                       <div className="grid grid-cols-2 gap-4 mb-8">
+                          <div className="bg-gray-100 p-5 rounded-3xl border border-gray-200">
+                             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Volume</p>
+                             <p className="text-xl font-black">{selectedCrop.quantity} Kg</p>
+                          </div>
+                          <div className="bg-gray-100 p-5 rounded-3xl border border-gray-200">
+                             <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Quality</p>
+                             <p className="text-xl font-black text-green-700">{selectedCrop.qualityScore}% Grade</p>
+                          </div>
+                       </div>
+
+                       <button 
+                        onClick={() => handleConnectRequest(selectedCrop)}
+                        className="w-full bg-black text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-gray-200"
+                       >
+                         Confirm Harvest Request
+                       </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 opacity-40 flex flex-col items-center">
+                       <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                       </div>
+                       <p className="font-black uppercase tracking-widest text-[10px]">Select a sector or harvest pin to begin</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {route === AppRoute.NEGOTIATION && selectedCrop && (
+              <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
+                <ChatPortal 
+                  currentUser={user} 
+                  connectedWith={selectedCrop} 
+                  onConfirmQuality={() => setRoute(AppRoute.ESCROW)}
+                />
+              </div>
+            )}
+
+            {route === AppRoute.ESCROW && selectedCrop && (
+              <div className="flex-1 bg-gray-50 p-6 overflow-y-auto flex flex-col items-center justify-center">
+                <div className="w-full max-w-md mb-4">
+                  <button onClick={() => setRoute(AppRoute.NEGOTIATION)} className="text-xs font-black text-gray-400 hover:text-black flex items-center space-x-2">
+                    <span>←</span> <span>RETURN TO PORTAL</span>
+                  </button>
+                </div>
+                <EscrowPortal 
+                  item={selectedCrop} 
+                  onRelease={() => {
+                    alert("M-PESA B2B TRANSACTION SUCCESS: Funds released to " + selectedCrop.farmerName);
+                    setRoute(AppRoute.MARKETPLACE);
+                    setDrillDownRegion(null);
+                    setSelectedCrop(null);
+                  }} 
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <footer className="bg-white border-t border-gray-100 px-10 py-6 flex justify-between items-center text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] z-[60] shrink-0">
+         <div className="flex items-center space-x-8">
+            <p>&copy; 2024 Shumber Inc.</p>
+            <a href="#" className="hover:text-black">Safety</a>
+            <a href="#" className="hover:text-black">Escrow Terms</a>
+         </div>
+         <div className="flex items-center space-x-3">
+            <span className="text-black">Gemini AI Vision Certified</span>
+            <div className="w-1 h-1 bg-green-500 rounded-full"></div>
+            <span>Nakuru Hub</span>
+         </div>
+      </footer>
     </div>
   );
-}
+};
+
+export default App;

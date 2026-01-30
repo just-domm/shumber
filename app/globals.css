@@ -1,26 +1,115 @@
 @import "tailwindcss";
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;900&display=swap');
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --uber-black: #000000;
+  --uber-white: #ffffff;
+  --uber-gray: #f3f4f6;
+  --shumber-green: #22c55e;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', sans-serif;
+  background-color: var(--uber-gray);
+  color: var(--uber-black);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hard reset for Leaflet to fix staggered tiles */
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1;
+  background: #f3f4f6 !important;
+  outline: none;
+}
+
+/* This is the critical fix for staggered tiles if CSS loads after JS */
+.leaflet-tile-pane {
+  z-index: 2;
+}
+
+.leaflet-layer, .leaflet-tile-container, .leaflet-tile {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.leaflet-tile {
+  filter: grayscale(1) contrast(1.1) brightness(1.05); /* Cyberpunk-Uber look */
+  visibility: hidden;
+}
+
+.leaflet-tile-loaded {
+  visibility: inherit;
+}
+
+.uber-shadow {
+  box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+}
+
+@keyframes scan-line {
+  0% { top: 0; }
+  50% { top: 100%; }
+  100% { top: 0; }
+}
+
+.animate-scan {
+  animation: scan-line 2s linear infinite;
+}
+
+.animate-fadeIn { 
+  animation: fadeIn 0.4s ease-out forwards; 
+}
+
+.animate-slideInRight { 
+  animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+}
+
+@keyframes fadeIn { 
+  from { opacity: 0; transform: translateY(15px); } 
+  to { opacity: 1; transform: translateY(0); } 
+}
+
+@keyframes slideInRight { 
+  from { transform: translateX(100%); } 
+  to { transform: translateX(0); } 
+}
+
+.uber-tooltip {
+  background: black !important;
+  color: white !important;
+  border: none !important;
+  font-weight: 900 !important;
+  font-size: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  padding: 10px 16px !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
+}
+
+.uber-tooltip::before {
+  border-top-color: black !important;
+}
+
+.shumber-marker {
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.shumber-marker:hover {
+  transform: scale(1.2);
+  cursor: pointer;
 }

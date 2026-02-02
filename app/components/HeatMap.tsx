@@ -16,6 +16,7 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
   const [libReady, setLibReady] = useState(false);
   const lastInventoryKeyRef = useRef<string>('');
   const lastSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const lastHeatPointsRef = useRef<number[][]>([]);
 
   // Dynamically load Leaflet JS, CSS, and Heat Plugin
   useEffect(() => {
@@ -99,7 +100,17 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
         const last = lastSizeRef.current;
         if (!last || last.width !== width || last.height !== height) {
           lastSizeRef.current = { width, height };
+          if (width === 0 || height === 0) {
+            if (heatLayerRef.current) {
+              mapRef.current.removeLayer(heatLayerRef.current);
+              heatLayerRef.current = null;
+            }
+            return;
+          }
           mapRef.current.invalidateSize();
+          if (heatLayerRef.current && lastHeatPointsRef.current.length > 0) {
+            heatLayerRef.current.setLatLngs(lastHeatPointsRef.current);
+          }
         }
       });
       resizeObserver.observe(mapContainerRef.current);
@@ -124,7 +135,8 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
     const L = (window as any).L;
     if (!mapRef.current || !L || !libReady) return;
     if (!mapContainerRef.current) return;
-    if (mapContainerRef.current.offsetWidth === 0 || mapContainerRef.current.offsetHeight === 0) {
+    const size = mapRef.current.getSize();
+    if (size.x === 0 || size.y === 0) {
       window.setTimeout(() => {
         if (mapRef.current) {
           mapRef.current.invalidateSize();
@@ -147,6 +159,7 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
       item.location.lng,
       0.8
     ]);
+    lastHeatPointsRef.current = heatPoints;
 
     if (L.heatLayer) {
       if (heatPoints.length === 0) {

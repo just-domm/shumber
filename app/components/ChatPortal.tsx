@@ -1,30 +1,98 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { fetchMessages, sendMessage } from '@/services/api';
 import { User, CropInventory, Message } from '@/types';
 
 interface ChatPortalProps {
   currentUser: User;
   connectedWith: CropInventory;
+  authToken: string;
+  requestedQuantity?: number;
   onConfirmQuality: () => void;
 }
 
-const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, onConfirmQuality }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    { id: '1', senderId: 'system', text: `Connection established with ${connectedWith.farmerName}`, timestamp: new Date().toISOString() },
-    { id: '2', senderId: connectedWith.farmerId, text: `Hello! I have the ${connectedWith.cropName} ready for collection at Njoro hub.`, timestamp: new Date().toISOString() }
-  ]);
+const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, authToken, requestedQuantity, onConfirmQuality }) => {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
+  const toast = (message: string, tone: 'info' | 'success' | 'error' = 'info') => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('shumber-toast', { detail: { message, tone } }));
+  };
 
-  const sendMessage = () => {
-    if (!inputText.trim()) return;
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      senderId: currentUser.id,
-      text: inputText,
-      timestamp: new Date().toISOString()
+  useEffect(() => {
+    const loadMessages = async () => {
+      setLoadError(null);
+      try {
+        const data = await fetchMessages(connectedWith.id, authToken);
+        if (data.length === 0) {
+          setMessages([
+            {
+              id: 'system',
+              senderId: 'system',
+              text: `Connection established with ${connectedWith.farmerName}`,
+              timestamp: new Date().toISOString()
+            }
+          ]);
+        } else {
+          setMessages(data);
+        }
+      } catch (error) {
+        console.error('Failed to load messages', error);
+        setLoadError('Could not load messages.');
+        setMessages([
+          {
+            id: 'system',
+            senderId: 'system',
+            text: `Connection established with ${connectedWith.farmerName}`,
+            timestamp: new Date().toISOString()
+          }
+        ]);
+      }
     };
-    setMessages([...messages, newMessage]);
-    setInputText('');
+
+    if (authToken) {
+      loadMessages();
+    }
+  }, [authToken, connectedWith]);
+
+  useEffect(() => {
+    if (!authToken) return;
+    const poll = async () => {
+      try {
+        const data = await fetchMessages(connectedWith.id, authToken);
+        if (data.length > 0) {
+          setMessages(data);
+        }
+      } catch (error) {
+        console.error('Chat poll failed', error);
+      }
+    };
+
+    poll();
+    pollRef.current = window.setInterval(poll, 3000);
+    return () => {
+      if (pollRef.current) {
+        window.clearInterval(pollRef.current);
+      }
+    };
+  }, [authToken, connectedWith.id]);
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim()) return;
+    if (!authToken) {
+      toast('Please log in to send messages.', 'error');
+      return;
+    }
+    try {
+      const newMessage = await sendMessage(connectedWith.id, authToken, inputText.trim());
+      setMessages((prev) => [...prev, newMessage]);
+      setInputText('');
+    } catch (error) {
+      console.error('Failed to send message', error);
+      toast('Message failed to send. Please retry.', 'error');
+    }
   };
 
   return (
@@ -42,10 +110,20 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, onC
         <div className="text-right">
           <p className="text-xs text-gray-400 uppercase font-bold tracking-widest">Escrow Total</p>
           <p className="font-bold text-green-400 text-lg">KES {connectedWith.currentBid * connectedWith.quantity}</p>
+          {requestedQuantity ? (
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+              Requested: {requestedQuantity} Kg
+            </p>
+          ) : null}
         </div>
       </div>
 
       <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-gray-50">
+        {loadError && (
+          <div className="bg-red-50 text-red-600 text-xs font-bold uppercase tracking-widest rounded-full px-4 py-2 mx-auto">
+            {loadError}
+          </div>
+        )}
         {messages.map(msg => (
           <div key={msg.id} className={`flex ${msg.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
@@ -64,11 +142,11 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, onC
             type="text" 
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
             placeholder="Discuss collection time or logistics..."
             className="flex-1 bg-gray-100 p-3 rounded-full outline-none text-sm focus:ring-2 focus:ring-black"
           />
-          <button onClick={sendMessage} className="bg-black text-white p-3 rounded-full hover:scale-105 transition-transform">
+          <button onClick={handleSendMessage} className="bg-black text-white p-3 rounded-full hover:scale-105 transition-transform">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
           </button>
         </div>

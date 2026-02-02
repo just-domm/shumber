@@ -25,7 +25,8 @@ export const INITIAL_INVENTORY: CropInventory[] = [
     currentBid: 48,
     location: NAKURU_LOCATIONS[4], // Njoro
     timestamp: new Date().toISOString(),
-    status: 'AVAILABLE'
+    status: 'AVAILABLE',
+    listingType: 'BIDDING'
   },
   {
     id: 'c1-alt',
@@ -38,7 +39,8 @@ export const INITIAL_INVENTORY: CropInventory[] = [
     currentBid: 32,
     location: { name: 'Njoro', lat: -0.3450, lng: 35.9450 },
     timestamp: new Date().toISOString(),
-    status: 'AVAILABLE'
+    status: 'AVAILABLE',
+    listingType: 'BIDDING'
   },
   {
     id: 'c2',
@@ -51,7 +53,8 @@ export const INITIAL_INVENTORY: CropInventory[] = [
     currentBid: 22,
     location: NAKURU_LOCATIONS[1], // Bahati
     timestamp: new Date().toISOString(),
-    status: 'AVAILABLE'
+    status: 'AVAILABLE',
+    listingType: 'BIDDING'
   },
   {
     id: 'c3',
@@ -64,6 +67,7 @@ export const INITIAL_INVENTORY: CropInventory[] = [
     currentBid: 35,
     location: NAKURU_LOCATIONS[4], // Njoro
     timestamp: new Date().toISOString(),
-    status: 'AVAILABLE'
+    status: 'AVAILABLE',
+    listingType: 'BIDDING'
   }
 ];

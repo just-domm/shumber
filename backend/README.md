@@ -44,6 +44,18 @@ docker compose up --build
 
 - `POST /analysis`
 
+## Chat
+
+- `GET /chat/{inventory_id}/messages`
+- `POST /chat/{inventory_id}/messages`
+
+## Escrow
+
+- `GET /escrow/{inventory_id}`
+- `POST /escrow/{inventory_id}/start`
+- `POST /escrow/{inventory_id}/verify`
+- `POST /escrow/{inventory_id}/release`
+
 ## Quick Test
 
 ```bash

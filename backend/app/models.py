@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -17,6 +17,17 @@ class InventoryStatus(str, enum.Enum):
     AVAILABLE = "AVAILABLE"
     NEGOTIATING = "NEGOTIATING"
     SOLD = "SOLD"
+
+
+class ListingType(str, enum.Enum):
+    BIDDING = "BIDDING"
+    FIXED = "FIXED"
+
+
+class EscrowStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    VERIFIED = "VERIFIED"
+    RELEASED = "RELEASED"
 
 
 class User(Base):
@@ -49,8 +60,35 @@ class Inventory(Base):
     location_name: Mapped[str] = mapped_column(String(120), nullable=False)
     location_lat: Mapped[float] = mapped_column(Float, nullable=False)
     location_lng: Mapped[float] = mapped_column(Float, nullable=False)
-    image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     status: Mapped[InventoryStatus] = mapped_column(Enum(InventoryStatus), default=InventoryStatus.AVAILABLE)
+    listing_type: Mapped[ListingType] = mapped_column(
+        Enum(ListingType, name="listing_type"),
+        default=ListingType.BIDDING,
+        nullable=False,
+    )
 
     farmer: Mapped[User] = relationship(back_populates="inventory")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    inventory_id: Mapped[str] = mapped_column(String, ForeignKey("inventory.id"), nullable=False)
+    sender_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    text: Mapped[str] = mapped_column(String(2000), nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Escrow(Base):
+    __tablename__ = "escrow"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    inventory_id: Mapped[str] = mapped_column(String, ForeignKey("inventory.id"), nullable=False, unique=True)
+    buyer_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[EscrowStatus] = mapped_column(Enum(EscrowStatus), default=EscrowStatus.PENDING)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

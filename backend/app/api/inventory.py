@@ -42,6 +42,7 @@ def list_inventory(
             image_url=item.image_url,
             timestamp=item.timestamp,
             status=item.status,
+            listing_type=item.listing_type,
         )
         for item in items
     ]
@@ -70,6 +71,7 @@ def create_inventory(
         location_lng=payload.location.lng,
         image_url=payload.image_url,
         status=InventoryStatus.AVAILABLE,
+        listing_type=payload.listing_type,
     )
     db.add(item)
     db.commit()
@@ -89,6 +91,7 @@ def create_inventory(
         image_url=item.image_url,
         timestamp=item.timestamp,
         status=item.status,
+        listing_type=item.listing_type,
     )
 
 

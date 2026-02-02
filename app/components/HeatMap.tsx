@@ -14,6 +14,8 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
   const heatLayerRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const [libReady, setLibReady] = useState(false);
+  const lastInventoryKeyRef = useRef<string>('');
+  const lastSizeRef = useRef<{ width: number; height: number } | null>(null);
 
   // Dynamically load Leaflet JS, CSS, and Heat Plugin
   useEffect(() => {
@@ -84,8 +86,13 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
       }, 250);
 
       // Robust Resize Handling
-      const resizeObserver = new ResizeObserver(() => {
-        if (mapRef.current) {
+      const resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry || !mapRef.current) return;
+        const { width, height } = entry.contentRect;
+        const last = lastSizeRef.current;
+        if (!last || last.width !== width || last.height !== height) {
+          lastSizeRef.current = { width, height };
           mapRef.current.invalidateSize();
         }
       });
@@ -111,33 +118,40 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
     const L = (window as any).L;
     if (!mapRef.current || !L || !libReady) return;
 
-    // 1. Update Heat Layer (Actual zones)
-    if (heatLayerRef.current) {
-      mapRef.current.removeLayer(heatLayerRef.current);
-    }
+    const inventoryKey = inventory
+      .map(
+        (item) =>
+          `${item.id}:${item.location.lat},${item.location.lng}:${item.quantity}:${item.cropName}`
+      )
+      .join('|');
+    if (inventoryKey === lastInventoryKeyRef.current) return;
+    lastInventoryKeyRef.current = inventoryKey;
 
     const heatPoints = inventory.map(item => [
-      item.location.lat, 
-      item.location.lng, 
-      0.8 // Intensity
+      item.location.lat,
+      item.location.lng,
+      0.8
     ]);
 
     if (L.heatLayer) {
-      heatLayerRef.current = L.heatLayer(heatPoints, {
-        radius: 40,
-        blur: 25,
-        maxZoom: 13,
-        gradient: {
-          0.2: '#e2e8f0', // Slate 200
-          0.4: '#86efac', // Green 300
-          0.6: '#22c55e', // Green 500
-          0.8: '#16a34a', // Green 600
-          1.0: '#000000'  // Uber Black
-        }
-      }).addTo(mapRef.current);
+      if (heatLayerRef.current) {
+        heatLayerRef.current.setLatLngs(heatPoints);
+      } else {
+        heatLayerRef.current = L.heatLayer(heatPoints, {
+          radius: 40,
+          blur: 25,
+          maxZoom: 13,
+          gradient: {
+            0.2: '#e2e8f0',
+            0.4: '#86efac',
+            0.6: '#22c55e',
+            0.8: '#16a34a',
+            1.0: '#000000'
+          }
+        }).addTo(mapRef.current);
+      }
     }
 
-    // 2. Update Interactive Markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 

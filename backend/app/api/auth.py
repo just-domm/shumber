@@ -11,14 +11,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=Token)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
+    # Normalize emails for case-insensitive matching.
+    normalized_email = payload.email.lower()
     # Enforce unique emails to keep login deterministic.
-    existing = db.query(User).filter(User.email == payload.email).first()
+    existing = db.query(User).filter(User.email == normalized_email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
 
     user = User(
         name=payload.name,
-        email=payload.email,
+        email=normalized_email,
         role=payload.role,
         location=payload.location,
         hashed_password=hash_password(payload.password),
@@ -34,7 +36,8 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
     # Return the same error for user/pass mismatches.
-    user = db.query(User).filter(User.email == payload.email).first()
+    normalized_email = payload.email.lower()
+    user = db.query(User).filter(User.email == normalized_email).first()
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 

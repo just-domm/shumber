@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
-from .models import InventoryStatus, UserRole
+from .models import EscrowStatus, InventoryStatus, ListingType, UserRole
 
 
 class Location(BaseModel):
@@ -55,6 +55,7 @@ class CropInventoryBase(BaseModel):
     location: Location
     image_url: Optional[str] = None
     status: InventoryStatus = InventoryStatus.AVAILABLE
+    listing_type: ListingType = ListingType.BIDDING
 
 
 class CropInventoryCreate(BaseModel):
@@ -65,6 +66,7 @@ class CropInventoryCreate(BaseModel):
     current_bid: int
     location: Location
     image_url: Optional[str] = None
+    listing_type: ListingType = ListingType.BIDDING
 
 
 class CropInventoryOut(CropInventoryBase):
@@ -91,3 +93,35 @@ class AnalysisResult(BaseModel):
     freshnessScore: float
     estimatedShelfLife: str
     marketInsight: str
+
+
+class MessageCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class MessageOut(BaseModel):
+    id: str
+    inventory_id: str
+    sender_id: str
+    text: str
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EscrowStart(BaseModel):
+    amount: Optional[int] = None
+
+
+class EscrowOut(BaseModel):
+    id: str
+    inventory_id: str
+    buyer_id: str
+    amount: int
+    status: EscrowStatus
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

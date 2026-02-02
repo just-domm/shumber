@@ -1,7 +1,41 @@
-import { AnalysisResult, CropInventory, CropInventoryCreate, User } from '@/types';
+import { AnalysisResult, CropInventory, CropInventoryCreate, Escrow, Message, User } from '@/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const TOKEN_KEY = 'shamba_token';
+
+const mapInventory = (item: any): CropInventory => ({
+  id: item.id,
+  farmerId: item.farmer_id ?? item.farmerId,
+  farmerName: item.farmer_name ?? item.farmerName,
+  cropName: item.crop_name ?? item.cropName,
+  quantity: item.quantity,
+  qualityScore: item.quality_score ?? item.qualityScore,
+  basePrice: item.base_price ?? item.basePrice,
+  currentBid: item.current_bid ?? item.currentBid,
+  highestBidderId: item.highest_bidder_id ?? item.highestBidderId ?? undefined,
+  location: item.location,
+  imageUrl: item.image_url ?? item.imageUrl ?? undefined,
+  timestamp: item.timestamp,
+  status: item.status,
+  listingType: item.listing_type ?? item.listingType ?? 'BIDDING'
+});
+
+const mapMessage = (item: any): Message => ({
+  id: item.id,
+  senderId: item.sender_id ?? item.senderId,
+  text: item.text,
+  timestamp: item.timestamp
+});
+
+const mapEscrow = (item: any): Escrow => ({
+  id: item.id,
+  inventoryId: item.inventory_id ?? item.inventoryId,
+  buyerId: item.buyer_id ?? item.buyerId,
+  amount: item.amount,
+  status: item.status,
+  createdAt: item.created_at ?? item.createdAt,
+  updatedAt: item.updated_at ?? item.updatedAt
+});
 
 export type LoginResponse = {
   access_token: string;
@@ -13,7 +47,7 @@ export const login = async (email: string, password: string): Promise<LoginRespo
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email: email.toLowerCase(), password })
   });
 
   if (!res.ok) {
@@ -57,7 +91,7 @@ export const fetchInventory = async (): Promise<CropInventory[]> => {
     throw new Error('Failed to fetch inventory');
   }
   const data = await res.json();
-  return data as CropInventory[];
+  return (data as any[]).map(mapInventory);
 };
 
 export const createInventory = async (
@@ -77,7 +111,8 @@ export const createInventory = async (
       base_price: payload.basePrice,
       current_bid: payload.currentBid,
       location: payload.location,
-      image_url: payload.imageUrl
+      image_url: payload.imageUrl,
+      listing_type: payload.listingType
     })
   });
 
@@ -85,7 +120,8 @@ export const createInventory = async (
     throw new Error('Failed to create inventory');
   }
 
-  return res.json();
+  const data = await res.json();
+  return mapInventory(data);
 };
 
 export const analyzeProduceQuality = async (imageBase64: string): Promise<AnalysisResult> => {
@@ -100,4 +136,80 @@ export const analyzeProduceQuality = async (imageBase64: string): Promise<Analys
   }
 
   return res.json();
+};
+
+export const fetchMessages = async (inventoryId: string, token: string): Promise<Message[]> => {
+  const res = await fetch(`${API_BASE}/chat/${inventoryId}/messages`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store'
+  });
+  if (!res.ok) {
+    throw new Error('Failed to fetch messages');
+  }
+  const data = await res.json();
+  return (data as any[]).map(mapMessage);
+};
+
+export const sendMessage = async (
+  inventoryId: string,
+  token: string,
+  text: string
+): Promise<Message> => {
+  const res = await fetch(`${API_BASE}/chat/${inventoryId}/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) {
+    throw new Error('Failed to send message');
+  }
+  const data = await res.json();
+  return mapMessage(data);
+};
+
+export const startEscrow = async (
+  inventoryId: string,
+  token: string,
+  amount?: number
+): Promise<Escrow> => {
+  const res = await fetch(`${API_BASE}/escrow/${inventoryId}/start`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ amount })
+  });
+  if (!res.ok) {
+    throw new Error('Failed to start escrow');
+  }
+  const data = await res.json();
+  return mapEscrow(data);
+};
+
+export const verifyEscrow = async (inventoryId: string, token: string): Promise<Escrow> => {
+  const res = await fetch(`${API_BASE}/escrow/${inventoryId}/verify`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    throw new Error('Failed to verify escrow');
+  }
+  const data = await res.json();
+  return mapEscrow(data);
+};
+
+export const releaseEscrow = async (inventoryId: string, token: string): Promise<Escrow> => {
+  const res = await fetch(`${API_BASE}/escrow/${inventoryId}/release`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    throw new Error('Failed to release escrow');
+  }
+  const data = await res.json();
+  return mapEscrow(data);
 };

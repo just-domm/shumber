@@ -36,6 +36,7 @@ export interface CropInventory {
   imageUrl?: string;
   timestamp: string;
   status: 'AVAILABLE' | 'NEGOTIATING' | 'SOLD';
+  listingType: 'BIDDING' | 'FIXED';
 }
 
 export interface CropInventoryCreate {
@@ -50,6 +51,7 @@ export interface CropInventoryCreate {
     lng: number;
   };
   imageUrl?: string;
+  listingType: 'BIDDING' | 'FIXED';
 }
 
 export interface Message {
@@ -57,6 +59,18 @@ export interface Message {
   senderId: string;
   text: string;
   timestamp: string;
+}
+
+export type EscrowStatus = 'PENDING' | 'VERIFIED' | 'RELEASED';
+
+export interface Escrow {
+  id: string;
+  inventoryId: string;
+  buyerId: string;
+  amount: number;
+  status: EscrowStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AnalysisResult {

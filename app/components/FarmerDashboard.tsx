@@ -8,19 +8,26 @@ import { User, CropInventory, CropInventoryCreate, AnalysisResult } from '@/type
 interface FarmerDashboardProps {
   user: User;
   onCreateInventory: (item: CropInventoryCreate) => Promise<CropInventory | null>;
+  inventory: CropInventory[];
+  onOpenChat: (item: CropInventory) => void;
 }
 
-const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInventory }) => {
+const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInventory, inventory, onOpenChat }) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [quantity, setQuantity] = useState<string>('');
   const [locationName, setLocationName] = useState(NAKURU_LOCATIONS[0].name);
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [listingType, setListingType] = useState<'BIDDING' | 'FIXED'>('BIDDING');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const toast = (message: string, tone: 'info' | 'success' | 'error' = 'info') => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('shumber-toast', { detail: { message, tone } }));
+  };
 
   const startCamera = async () => {
     try {
@@ -34,7 +41,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
       }
     } catch (err) {
       console.error("Error accessing camera:", err);
-      alert("Could not access camera. Please check permissions.");
+      toast("Could not access camera. Please check permissions.", 'error');
     }
   };
 
@@ -79,7 +86,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
       setAnalysis(result);
     } catch (error) {
       console.error("Analysis failed", error);
-      alert("AI Analysis failed. Please try again with a clearer photo.");
+      toast("AI Analysis failed. Please try again with a clearer photo.", 'error');
     } finally {
       setAnalyzing(false);
     }
@@ -97,7 +104,8 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
       basePrice: basePrice,
       currentBid: basePrice,
       location: location,
-      imageUrl: preview || undefined
+      imageUrl: preview || undefined,
+      listingType
     };
 
     const created = await onCreateInventory(newItem);
@@ -105,6 +113,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
       setPreview(null);
       setAnalysis(null);
       setQuantity('');
+      setListingType('BIDDING');
     }
   };
 
@@ -223,6 +232,35 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
                 </div>
 
                 <div className="space-y-6">
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Selling Mode</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setListingType('BIDDING')}
+                        className={`rounded-2xl p-4 text-left border ${
+                          listingType === 'BIDDING'
+                            ? 'border-black bg-black text-white'
+                            : 'border-gray-200 bg-gray-100 text-black'
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase tracking-widest">Open Bidding</p>
+                        <p className="text-[11px] mt-2 opacity-70">Buyers compete for the best price.</p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setListingType('FIXED')}
+                        className={`rounded-2xl p-4 text-left border ${
+                          listingType === 'FIXED'
+                            ? 'border-black bg-black text-white'
+                            : 'border-gray-200 bg-gray-100 text-black'
+                        }`}
+                      >
+                        <p className="text-xs font-black uppercase tracking-widest">Fixed Price</p>
+                        <p className="text-[11px] mt-2 opacity-70">Sell instantly at your set price.</p>
+                      </button>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Weight (KG)</label>
@@ -264,6 +302,39 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
               </div>
             )}
           </div>
+        </div>
+      </div>
+      <div className="bg-white p-8 rounded-[40px] uber-shadow border border-gray-100 mt-8">
+        <header className="mb-6">
+          <h3 className="text-2xl font-black tracking-tighter text-black">Inbox</h3>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Open chats for your active listings
+          </p>
+        </header>
+        <div className="space-y-4">
+          {(() => {
+            const items = inventory.filter((item) => item.farmerId === user.id);
+            if (items.length === 0) {
+              return <p className="text-sm text-gray-400">No active listings yet.</p>;
+            }
+            return items.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between rounded-3xl border border-gray-100 p-4"
+              >
+                <div>
+                  <p className="text-sm font-black">{item.cropName}</p>
+                  <p className="text-[11px] text-gray-500 font-semibold">{item.location.name}</p>
+                </div>
+                <button
+                  onClick={() => onOpenChat(item)}
+                  className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full"
+                >
+                  Open Chat
+                </button>
+              </div>
+            ));
+          })()}
         </div>
       </div>
     </div>

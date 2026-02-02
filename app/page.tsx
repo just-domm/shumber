@@ -1,8 +1,17 @@
 'use client';
-import React, { useEffect, useState } from 'react';
-import { User, UserRole, CropInventory, CropInventoryCreate, AppRoute } from '@/types';
+import React, { useCallback, useEffect, useState } from 'react';
+import { User, UserRole, CropInventory, CropInventoryCreate, AppRoute, Escrow } from '@/types';
 import { INITIAL_INVENTORY } from '@/constants';
-import { createInventory, fetchInventory, login, fetchMe, storeToken, getStoredToken, clearToken } from '@/services/api';
+import {
+  createInventory,
+  fetchInventory,
+  login,
+  fetchMe,
+  storeToken,
+  getStoredToken,
+  clearToken,
+  startEscrow
+} from '@/services/api';
 import HeatMap from '@/app/components/HeatMap';
 import ChatPortal from '@/app/components/ChatPortal';
 import EscrowPortal from '@/app/components/EscrowPortal';
@@ -24,6 +33,14 @@ const App: React.FC = () => {
   const [drillDownRegion, setDrillDownRegion] = useState<string | null>(null);
   const [notification, setNotification] = useState<{show: boolean, type: string} | null>(null);
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const [escrow, setEscrow] = useState<Escrow | null>(null);
+  const [requestQuantity, setRequestQuantity] = useState<string>('');
+  const [pendingRoute, setPendingRoute] = useState<AppRoute | null>(null);
+  const [pendingCropId, setPendingCropId] = useState<string | null>(null);
+  const [pendingRole, setPendingRole] = useState<UserRole | null>(null);
+  const [pendingRegion, setPendingRegion] = useState<string | null>(null);
+  const [pendingQuantity, setPendingQuantity] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ show: boolean; message: string; tone: 'info' | 'success' | 'error' } | null>(null);
   const user: User = authUser || {
     id: 'guest',
     name: 'Guest User',
@@ -37,6 +54,7 @@ const App: React.FC = () => {
 
   const handleConnectRequest = (crop: CropInventory) => {
     setSelectedCrop(crop);
+    setRequestQuantity('');
     setNotification({ show: true, type: 'REQUESTING' });
     
     setTimeout(() => {
@@ -47,6 +65,104 @@ const App: React.FC = () => {
       }, 1500);
     }, 2500);
   };
+
+  const showToast = useCallback((message: string, tone: 'info' | 'success' | 'error' = 'info') => {
+    setToast({ show: true, message, tone });
+    window.setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as { message?: string; tone?: 'info' | 'success' | 'error' } | undefined;
+      if (!detail?.message) return;
+      showToast(detail.message, detail.tone || 'info');
+    };
+    window.addEventListener('shumber-toast', handler as EventListener);
+    return () => window.removeEventListener('shumber-toast', handler as EventListener);
+  }, [showToast]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('shumber_route', route);
+  }, [route]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (selectedCrop) {
+      localStorage.setItem('shumber_selected_crop_id', selectedCrop.id);
+    } else {
+      localStorage.removeItem('shumber_selected_crop_id');
+    }
+  }, [selectedCrop]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('shumber_user_role', userRole);
+  }, [userRole]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (drillDownRegion) {
+      localStorage.setItem('shumber_region', drillDownRegion);
+    } else {
+      localStorage.removeItem('shumber_region');
+    }
+  }, [drillDownRegion]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (requestQuantity) {
+      localStorage.setItem('shumber_request_quantity', requestQuantity);
+    } else {
+      localStorage.removeItem('shumber_request_quantity');
+    }
+  }, [requestQuantity]);
+
+  const handleStartEscrow = async () => {
+    if (!selectedCrop) return;
+    if (!authToken) {
+      showToast('Please log in to start escrow.', 'error');
+      return;
+    }
+    try {
+      const quantity = Math.max(
+        1,
+        Math.min(selectedCrop.quantity, parseInt(requestQuantity || `${selectedCrop.quantity}`, 10))
+      );
+      const amount = selectedCrop.currentBid * quantity;
+      const created = await startEscrow(selectedCrop.id, authToken, amount);
+      setEscrow(created);
+      setRoute(AppRoute.ESCROW);
+    } catch (error) {
+      console.error('Failed to start escrow', error);
+      showToast('Escrow setup failed. Please try again.', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedRoute = localStorage.getItem('shumber_route') as AppRoute | null;
+    const storedCropId = localStorage.getItem('shumber_selected_crop_id');
+    const storedRole = localStorage.getItem('shumber_user_role') as UserRole | null;
+    const storedRegion = localStorage.getItem('shumber_region');
+    const storedQuantity = localStorage.getItem('shumber_request_quantity');
+    if (storedRoute) {
+      setPendingRoute(storedRoute);
+    }
+    if (storedCropId) {
+      setPendingCropId(storedCropId);
+    }
+    if (storedRole) {
+      setPendingRole(storedRole);
+    }
+    if (storedRegion) {
+      setPendingRegion(storedRegion);
+    }
+    if (storedQuantity) {
+      setPendingQuantity(storedQuantity);
+    }
+  }, []);
 
   useEffect(() => {
     const loadInventory = async () => {
@@ -65,6 +181,40 @@ const App: React.FC = () => {
 
     loadInventory();
   }, []);
+
+  useEffect(() => {
+    if (pendingRole) {
+      setUserRole(pendingRole);
+    }
+    if (pendingRegion) {
+      setDrillDownRegion(pendingRegion);
+    }
+    if (pendingQuantity) {
+      setRequestQuantity(pendingQuantity);
+    }
+    if (!pendingCropId) {
+      setPendingRole(null);
+      setPendingRegion(null);
+      return;
+    }
+    const match = inventory.find((item) => item.id === pendingCropId);
+    if (match) {
+      setSelectedCrop(match);
+      if (pendingRoute) {
+        setRoute(pendingRoute);
+      }
+    }
+    setPendingCropId(null);
+    setPendingRoute(null);
+    setPendingRole(null);
+    setPendingRegion(null);
+    setPendingQuantity(null);
+  }, [inventory, pendingCropId, pendingRoute, pendingRole, pendingRegion, pendingQuantity]);
+
+  useEffect(() => {
+    if (!selectedCrop) return;
+    setRequestQuantity('');
+  }, [selectedCrop]);
 
   useEffect(() => {
     const bootstrapAuth = async () => {
@@ -110,12 +260,19 @@ const App: React.FC = () => {
     setAuthUser(null);
     setAuthToken(null);
     setUserRole(UserRole.BUYER);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('shumber_route');
+      localStorage.removeItem('shumber_selected_crop_id');
+      localStorage.removeItem('shumber_user_role');
+      localStorage.removeItem('shumber_region');
+      localStorage.removeItem('shumber_request_quantity');
+    }
   };
 
   const handleCreateInventory = async (payload: CropInventoryCreate) => {
     try {
       if (!authToken) {
-        alert('Please log in as a farmer first.');
+        showToast('Please log in as a farmer first.', 'error');
         return null;
       }
       const created = await createInventory(authToken, payload);
@@ -127,7 +284,7 @@ const App: React.FC = () => {
       return created;
     } catch (error) {
       console.error('Failed to create inventory', error);
-      alert('Posting failed. Please ensure the backend is running.');
+      showToast('Posting failed. Please ensure the backend is running.', 'error');
       return null;
     }
   };
@@ -150,6 +307,25 @@ const App: React.FC = () => {
                 {notification.type === 'REQUESTING' ? 'Connecting to Hub...' : 'Live on Marketplace'}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {toast?.show && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-sm px-6">
+          <div
+            className={`p-4 rounded-3xl shadow-2xl border flex items-center space-x-3 ${
+              toast.tone === 'success'
+                ? 'bg-green-600 text-white border-green-700'
+                : toast.tone === 'error'
+                ? 'bg-red-600 text-white border-red-700'
+                : 'bg-black text-white border-gray-800'
+            }`}
+          >
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+              <div className="w-2 h-2 bg-white rounded-full"></div>
+            </div>
+            <p className="text-xs font-black uppercase tracking-widest">{toast.message}</p>
           </div>
         </div>
       )}
@@ -212,11 +388,11 @@ const App: React.FC = () => {
           <button 
             onClick={() => {
               if (!authUser) {
-                alert('Please log in to switch roles.');
+                showToast('Please log in to switch roles.', 'error');
                 return;
               }
               if (userRole === UserRole.BUYER && authUser.role !== UserRole.FARMER) {
-                alert('This account is not a farmer.');
+                showToast('This account is not a farmer.', 'error');
                 return;
               }
               setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER);
@@ -277,8 +453,61 @@ const App: React.FC = () => {
         )}
         {userRole === UserRole.FARMER ? (
           <div className="flex-1 overflow-y-auto">
-            {authUser?.role === UserRole.FARMER ? (
-              <FarmerDashboard user={{...user, role: UserRole.FARMER}} onCreateInventory={handleCreateInventory} />
+            {route === AppRoute.NEGOTIATION && selectedCrop ? (
+              <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
+                <div className="max-w-2xl mx-auto mb-4">
+                  <button
+                    onClick={() => setRoute(AppRoute.MARKETPLACE)}
+                    className="text-xs font-black text-gray-400 hover:text-black flex items-center space-x-2"
+                  >
+                    <span>←</span> <span>BACK TO DASHBOARD</span>
+                  </button>
+                </div>
+                <ChatPortal
+                  currentUser={user}
+                  connectedWith={selectedCrop}
+                  authToken={authToken || ''}
+                  onConfirmQuality={handleStartEscrow}
+                />
+              </div>
+            ) : route === AppRoute.ESCROW && selectedCrop ? (
+              <div className="flex-1 bg-gray-50 p-6 overflow-y-auto flex flex-col items-center justify-center">
+                <div className="w-full max-w-md mb-4">
+                  <button
+                    onClick={() => setRoute(AppRoute.MARKETPLACE)}
+                    className="text-xs font-black text-gray-400 hover:text-black flex items-center space-x-2"
+                  >
+                    <span>←</span> <span>BACK TO DASHBOARD</span>
+                  </button>
+                </div>
+                <EscrowPortal
+                  item={selectedCrop}
+                  authToken={authToken || ''}
+                  escrow={escrow}
+                  onRelease={() => {
+                    showToast(`M-PESA B2B SUCCESS: Funds released to ${selectedCrop.farmerName}`, 'success');
+                    setInventory((prev) =>
+                      prev.map((item) =>
+                        item.id === selectedCrop.id ? { ...item, status: 'SOLD' } : item
+                      )
+                    );
+                    setRoute(AppRoute.MARKETPLACE);
+                    setDrillDownRegion(null);
+                    setSelectedCrop(null);
+                    setEscrow(null);
+                  }}
+                />
+              </div>
+            ) : authUser?.role === UserRole.FARMER ? (
+              <FarmerDashboard
+                user={{...user, role: UserRole.FARMER}}
+                onCreateInventory={handleCreateInventory}
+                inventory={inventory}
+                onOpenChat={(item) => {
+                  setSelectedCrop(item);
+                  setRoute(AppRoute.NEGOTIATION);
+                }}
+              />
             ) : (
               <div className="h-full flex items-center justify-center p-10">
                 <div className="bg-white p-10 rounded-[32px] shadow-xl border border-gray-100 text-center max-w-md">
@@ -324,11 +553,14 @@ const App: React.FC = () => {
                         </div>
                         <button onClick={() => setDrillDownRegion(null)} className="text-xs font-black text-gray-300 hover:text-black transition-colors">BACK</button>
                       </div>
-                      <div className="space-y-4">
+                      <div className="space-y-4 overflow-y-auto max-h-[calc(100vh-220px)] pr-1">
                         {farmersInRegion.map(item => (
                           <div 
                             key={item.id}
-                            onClick={() => setSelectedCrop(item)}
+                            onClick={() => {
+                              setSelectedCrop(item);
+                              setDrillDownRegion(null);
+                            }}
                             className={`p-5 rounded-3xl border-2 transition-all cursor-pointer ${selectedCrop?.id === item.id ? 'border-black bg-gray-50 shadow-xl scale-[1.02]' : 'border-gray-50 hover:border-gray-200'}`}
                           >
                             <div className="flex justify-between items-start mb-3">
@@ -336,6 +568,12 @@ const App: React.FC = () => {
                               <span className="bg-green-100 text-green-800 text-[10px] px-2.5 py-1 rounded-full font-black uppercase tracking-tighter">{item.qualityScore}% QA</span>
                             </div>
                             <p className="text-sm font-medium text-gray-500 mb-4">{item.cropName}</p>
+                            <div className="flex items-center justify-between mb-4">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Listing</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full bg-black text-white">
+                                {item.listingType === 'FIXED' ? 'Fixed Price' : 'Open Bid'}
+                              </span>
+                            </div>
                             <div className="flex justify-between items-end">
                               <div>
                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Market Price</p>
@@ -364,11 +602,31 @@ const App: React.FC = () => {
                           </div>
                        </div>
 
+                       <div className="bg-white border border-gray-200 rounded-3xl p-5 mb-8">
+                         <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">Request Amount (Kg)</p>
+                         <div className="flex items-center space-x-3">
+                           <input
+                             type="number"
+                             min={1}
+                             max={selectedCrop.quantity}
+                             value={requestQuantity || selectedCrop.quantity}
+                             onChange={(e) => setRequestQuantity(e.target.value)}
+                             className="flex-1 bg-gray-100 border border-gray-200 rounded-2xl p-4 font-bold focus:ring-2 focus:ring-black outline-none"
+                           />
+                           <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                             Max {selectedCrop.quantity}
+                           </div>
+                         </div>
+                         <p className="text-[11px] text-gray-500 font-semibold mt-3">
+                           Estimated total: KES {selectedCrop.currentBid * Math.max(1, Math.min(selectedCrop.quantity, parseInt(requestQuantity || `${selectedCrop.quantity}`, 10)))}
+                         </p>
+                       </div>
+
                        <button 
                         onClick={() => handleConnectRequest(selectedCrop)}
                         className="w-full bg-black text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-gray-200"
                        >
-                         Confirm Harvest Request
+                         {selectedCrop.listingType === 'FIXED' ? 'Buy At Fixed Price' : 'Start Bid Request'}
                        </button>
                     </div>
                   ) : (
@@ -387,8 +645,17 @@ const App: React.FC = () => {
               <div className="flex-1 bg-gray-100 p-6 overflow-y-auto">
                 <ChatPortal 
                   currentUser={user} 
-                  connectedWith={selectedCrop} 
-                  onConfirmQuality={() => setRoute(AppRoute.ESCROW)}
+                  connectedWith={selectedCrop}
+                  authToken={authToken || ''}
+                  requestedQuantity={
+                    requestQuantity
+                      ? Math.max(
+                          1,
+                          Math.min(selectedCrop.quantity, parseInt(requestQuantity, 10))
+                        )
+                      : undefined
+                  }
+                  onConfirmQuality={handleStartEscrow}
                 />
               </div>
             )}
@@ -402,11 +669,19 @@ const App: React.FC = () => {
                 </div>
                 <EscrowPortal 
                   item={selectedCrop} 
+                  authToken={authToken || ''}
+                  escrow={escrow}
                   onRelease={() => {
-                    alert("M-PESA B2B TRANSACTION SUCCESS: Funds released to " + selectedCrop.farmerName);
+                    showToast(`M-PESA B2B SUCCESS: Funds released to ${selectedCrop.farmerName}`, 'success');
+                    setInventory((prev) =>
+                      prev.map((item) =>
+                        item.id === selectedCrop.id ? { ...item, status: 'SOLD' } : item
+                      )
+                    );
                     setRoute(AppRoute.MARKETPLACE);
                     setDrillDownRegion(null);
                     setSelectedCrop(null);
+                    setEscrow(null);
                   }} 
                 />
               </div>
@@ -417,7 +692,7 @@ const App: React.FC = () => {
 
       <footer className="bg-white border-t border-gray-100 px-10 py-6 flex justify-between items-center text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] z-[60] shrink-0">
          <div className="flex items-center space-x-8">
-            <p>&copy; 2024 Shumber Inc.</p>
+            <p>&copy; {new Date().getFullYear()} Shumber Inc.</p>
             <a href="#" className="hover:text-black">Safety</a>
             <a href="#" className="hover:text-black">Escrow Terms</a>
          </div>

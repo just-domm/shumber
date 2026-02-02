@@ -221,7 +221,7 @@ const HeatMap: React.FC<HeatMapProps> = ({
 
       marker.on('click', () => (item.location.name === 'Njoro' ? onRegionSelect('Njoro') : onSelectCrop(item)));
 
-      const sourceTag = item.source ? `<span style=\"color:#22c55e; font-size:8px;\">● ${item.source}</span>` : '';
+      const sourceTag = item.source ? `<span style="color:#22c55e; font-size:8px;">● ${item.source}</span>` : '';
       marker.bindTooltip(`<b>${item.farmerName}</b> ${sourceTag}<br/>${item.cropName}`, {
         className: 'uber-tooltip',
         direction: 'top',

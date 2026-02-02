@@ -29,7 +29,6 @@ const HeatMap: React.FC<HeatMapProps> = ({
 
   useEffect(() => {
     const loadAssets = async () => {
-      // Load Leaflet JS & CSS
       if (!document.getElementById('leaflet-css')) {
         const link = document.createElement('link');
         link.id = 'leaflet-css';
@@ -38,16 +37,15 @@ const HeatMap: React.FC<HeatMapProps> = ({
         document.head.appendChild(link);
       }
       if (!(window as any).L) {
-        await new Promise(r => {
+        await new Promise((r) => {
           const s = document.createElement('script');
           s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
           s.onload = r;
           document.head.appendChild(s);
         });
       }
-      // Load Heatmap Plugin
       if (!(window as any).L.heatLayer) {
-        await new Promise(r => {
+        await new Promise((r) => {
           const s = document.createElement('script');
           s.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js';
           s.onload = r;
@@ -61,63 +59,177 @@ const HeatMap: React.FC<HeatMapProps> = ({
 
   useEffect(() => {
     if (!libReady || !mapContainerRef.current || mapRef.current) return;
+    if (mapContainerRef.current.offsetWidth === 0 || mapContainerRef.current.offsetHeight === 0) {
+      const retry = window.setTimeout(() => setInitTick((t) => t + 1), 200);
+      return () => window.clearTimeout(retry);
+    }
+
     const L = (window as any).L;
-    
-    mapRef.current = L.map(mapContainerRef.current, { 
-      zoomControl: false, 
-      attributionControl: false 
-    }).setView([-0.3031, 36.0800], 11);
+    let resizeObserver: ResizeObserver | null = null;
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      subdomains: 'abcd',
-      maxZoom: 19
-    }).addTo(mapRef.current);
+    try {
+      mapRef.current = L.map(mapContainerRef.current, {
+        zoomControl: false,
+        attributionControl: false,
+        fadeAnimation: true,
+        markerZoomAnimation: true,
+        scrollWheelZoom: true
+      });
 
-    // Fix staggered tiles with a delay
-    setTimeout(() => {
-      if (mapRef.current) mapRef.current.invalidateSize();
-    }, 400);
+      const storedCenter = localStorage.getItem('shumber_map_center');
+      const storedZoom = localStorage.getItem('shumber_map_zoom');
+      if (storedCenter && storedZoom) {
+        try {
+          const parsed = JSON.parse(storedCenter) as [number, number];
+          const zoom = parseInt(storedZoom, 10);
+          mapRef.current.setView(parsed, zoom);
+        } catch {
+          mapRef.current.setView(defaultCenter, defaultZoom);
+        }
+      } else {
+        mapRef.current.setView(defaultCenter, defaultZoom);
+      }
 
-    const ro = new ResizeObserver(() => {
-      if (mapRef.current) mapRef.current.invalidateSize();
-    });
-    ro.observe(mapContainerRef.current);
-    return () => ro.disconnect();
-  }, [libReady]);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        subdomains: 'abcd',
+        maxZoom: 19
+      }).addTo(mapRef.current);
+
+      setTimeout(() => {
+        if (mapRef.current) mapRef.current.invalidateSize();
+      }, 400);
+
+      resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry || !mapRef.current) return;
+        const { width, height } = entry.contentRect;
+        const last = lastSizeRef.current;
+        if (!last || last.width !== width || last.height !== height) {
+          lastSizeRef.current = { width, height };
+          if (width === 0 || height === 0) {
+            if (heatLayerRef.current) {
+              mapRef.current.removeLayer(heatLayerRef.current);
+              heatLayerRef.current = null;
+            }
+            return;
+          }
+          mapRef.current.invalidateSize();
+          if (heatLayerRef.current && lastHeatPointsRef.current.length > 0) {
+            heatLayerRef.current.setLatLngs(lastHeatPointsRef.current);
+          }
+        }
+      });
+      resizeObserver.observe(mapContainerRef.current);
+
+      mapRef.current.on('moveend zoomend', () => {
+        if (!mapRef.current) return;
+        const center = mapRef.current.getCenter();
+        localStorage.setItem('shumber_map_center', JSON.stringify([center.lat, center.lng]));
+        localStorage.setItem('shumber_map_zoom', `${mapRef.current.getZoom()}`);
+      });
+
+      if (!storedCenter && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!mapRef.current) return;
+            mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], defaultZoom);
+            localStorage.setItem(
+              'shumber_map_center',
+              JSON.stringify([pos.coords.latitude, pos.coords.longitude])
+            );
+            localStorage.setItem('shumber_map_zoom', `${defaultZoom}`);
+          },
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }
+        );
+      }
+    } catch (e) {
+      console.error('Leaflet initialization failed', e);
+    }
+
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [libReady, initTick, defaultCenter, defaultZoom]);
 
   useEffect(() => {
     const L = (window as any).L;
-    if (!mapRef.current || !L || !libReady) return;
-
-    // Heat Layer
-    if (heatLayerRef.current) mapRef.current.removeLayer(heatLayerRef.current);
-    const points = inventory.map(i => [i.location.lat, i.location.lng, 0.7]);
-    if (L.heatLayer) {
-      heatLayerRef.current = L.heatLayer(points, { 
-        radius: 35, 
-        blur: 20, 
-        gradient: { 0.4: '#86efac', 0.6: '#22c55e', 0.8: '#16a34a', 1.0: '#000000' } 
-      }).addTo(mapRef.current);
+    if (!mapRef.current || !L || !libReady || !mapContainerRef.current) return;
+    const size = mapRef.current.getSize();
+    if (size.x === 0 || size.y === 0) {
+      window.setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 200);
+      return;
     }
 
-    // Markers
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = inventory.map(item => {
+    const inventoryKey = inventory
+      .map(
+        (item) =>
+          `${item.id}:${item.location.lat},${item.location.lng}:${item.quantity}:${item.cropName}:${item.farmerName}:${
+            item.source || ''
+          }`
+      )
+      .join('|');
+    if (inventoryKey === lastInventoryKeyRef.current) return;
+    lastInventoryKeyRef.current = inventoryKey;
+
+    const heatPoints = inventory.map((item) => [item.location.lat, item.location.lng, 0.8]);
+    lastHeatPointsRef.current = heatPoints;
+
+    if (L.heatLayer) {
+      if (heatPoints.length === 0) {
+        if (heatLayerRef.current) {
+          mapRef.current.removeLayer(heatLayerRef.current);
+          heatLayerRef.current = null;
+        }
+        return;
+      }
+      if (heatLayerRef.current) {
+        heatLayerRef.current.setLatLngs(heatPoints);
+      } else {
+        heatLayerRef.current = L.heatLayer(heatPoints, {
+          radius: 40,
+          blur: 25,
+          maxZoom: 13,
+          gradient: {
+            0.2: '#e2e8f0',
+            0.4: '#86efac',
+            0.6: '#22c55e',
+            0.8: '#16a34a',
+            1.0: '#000000'
+          }
+        }).addTo(mapRef.current);
+      }
+    }
+
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = inventory.map((item) => {
       const marker = L.circleMarker([item.location.lat, item.location.lng], {
-        radius: 12, fillColor: '#000', color: '#fff', weight: 2, fillOpacity: 0.9
+        radius: 12,
+        fillColor: '#000',
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.9
       }).addTo(mapRef.current);
-      
-      marker.on('click', () => item.location.name === 'Njoro' ? onRegionSelect('Njoro') : onSelectCrop(item));
-      
+
+      marker.on('click', () => (item.location.name === 'Njoro' ? onRegionSelect('Njoro') : onSelectCrop(item)));
+
       const sourceTag = item.source ? `<span style="color:#22c55e; font-size:8px;">● ${item.source}</span>` : '';
-      marker.bindTooltip(`<b>${item.farmerName}</b> ${sourceTag}<br/>${item.cropName}`, { 
-        className: 'uber-tooltip', 
-        direction: 'top', 
-        offset: [0, -10] 
+      marker.bindTooltip(`<b>${item.farmerName}</b> ${sourceTag}<br/>${item.cropName}`, {
+        className: 'uber-tooltip',
+        direction: 'top',
+        offset: [0, -10]
       });
       return marker;
     });
-  }, [inventory, libReady]);
+  }, [inventory, libReady, onRegionSelect, onSelectCrop]);
 
   return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full bg-[#f3f4f6] overflow-hidden" />;
 };

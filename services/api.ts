@@ -184,7 +184,14 @@ export const startEscrow = async (
     body: JSON.stringify({ amount })
   });
   if (!res.ok) {
-    throw new Error('Failed to start escrow');
+    let detail = 'Failed to start escrow';
+    try {
+      const data = await res.json();
+      if (data?.detail) detail = data.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
   }
   const data = await res.json();
   return mapEscrow(data);
@@ -196,7 +203,14 @@ export const verifyEscrow = async (inventoryId: string, token: string): Promise<
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) {
-    throw new Error('Failed to verify escrow');
+    let detail = 'Failed to verify escrow';
+    try {
+      const data = await res.json();
+      if (data?.detail) detail = data.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
   }
   const data = await res.json();
   return mapEscrow(data);
@@ -208,7 +222,14 @@ export const releaseEscrow = async (inventoryId: string, token: string): Promise
     headers: { Authorization: `Bearer ${token}` }
   });
   if (!res.ok) {
-    throw new Error('Failed to release escrow');
+    let detail = 'Failed to release escrow';
+    try {
+      const data = await res.json();
+      if (data?.detail) detail = data.detail;
+    } catch {
+      // ignore
+    }
+    throw new Error(detail);
   }
   const data = await res.json();
   return mapEscrow(data);

@@ -139,7 +139,8 @@ const App: React.FC = () => {
       setRoute(AppRoute.ESCROW);
     } catch (error) {
       console.error('Failed to start escrow', error);
-      showToast('Escrow setup failed. Please try again.', 'error');
+      const message = error instanceof Error ? error.message : 'Escrow setup failed. Please try again.';
+      showToast(message, 'error');
     }
   };
 

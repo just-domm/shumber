@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect, useRef,useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CropInventory } from '@/types';
 
 interface HeatMapProps {
@@ -57,8 +57,14 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
     loadAssets();
   }, []);
 
+  const [initTick, setInitTick] = useState(0);
+
   useEffect(() => {
     if (!libReady || !mapContainerRef.current || mapRef.current) return;
+    if (mapContainerRef.current.offsetWidth === 0 || mapContainerRef.current.offsetHeight === 0) {
+      const retry = window.setTimeout(() => setInitTick((t) => t + 1), 200);
+      return () => window.clearTimeout(retry);
+    }
 
     const L = (window as any).L;
     
@@ -111,7 +117,7 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
         mapRef.current = null;
       }
     };
-  }, [libReady]);
+  }, [libReady, initTick]);
 
   // Handle Markers and Heat Layer Update
   useEffect(() => {
@@ -119,6 +125,11 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
     if (!mapRef.current || !L || !libReady) return;
     if (!mapContainerRef.current) return;
     if (mapContainerRef.current.offsetWidth === 0 || mapContainerRef.current.offsetHeight === 0) {
+      window.setTimeout(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      }, 200);
       return;
     }
 

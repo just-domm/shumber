@@ -117,6 +117,10 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
   useEffect(() => {
     const L = (window as any).L;
     if (!mapRef.current || !L || !libReady) return;
+    if (!mapContainerRef.current) return;
+    if (mapContainerRef.current.offsetWidth === 0 || mapContainerRef.current.offsetHeight === 0) {
+      return;
+    }
 
     const inventoryKey = inventory
       .map(
@@ -134,6 +138,13 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
     ]);
 
     if (L.heatLayer) {
+      if (heatPoints.length === 0) {
+        if (heatLayerRef.current) {
+          mapRef.current.removeLayer(heatLayerRef.current);
+          heatLayerRef.current = null;
+        }
+        return;
+      }
       if (heatLayerRef.current) {
         heatLayerRef.current.setLatLngs(heatPoints);
       } else {

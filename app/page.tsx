@@ -619,7 +619,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ) : selectedCrop ? (
-                    <div className="animate-fadeIn flex flex-col max-h-[calc(100vh-200px)] overflow-y-auto pr-1">
+                    <div className="animate-fadeIn flex flex-col overflow-y-auto pr-1 pb-28">
                        <div className="mb-8">
                          <h2 className="text-4xl font-black tracking-tighter mb-1">{selectedCrop.cropName}</h2>
                          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{selectedCrop.farmerName} • Verified Origin</p>
@@ -656,13 +656,23 @@ const App: React.FC = () => {
                          </p>
                        </div>
 
-                       <div className="mt-auto pt-4">
-                         <button 
-                          onClick={() => handleConnectRequest(selectedCrop)}
-                          className="w-full bg-black text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-gray-200"
-                         >
-                           {selectedCrop.listingType === 'FIXED' ? 'Buy At Fixed Price' : 'Start Bid Request'}
-                         </button>
+                       <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-auto">
+                         <div className="lg:hidden bg-white/90 backdrop-blur border-t border-gray-100 px-6 py-4">
+                           <button 
+                            onClick={() => handleConnectRequest(selectedCrop)}
+                            className="w-full bg-black text-white py-4 rounded-3xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-gray-200"
+                           >
+                             {selectedCrop.listingType === 'FIXED' ? 'Buy At Fixed Price' : 'Start Bid Request'}
+                           </button>
+                         </div>
+                         <div className="hidden lg:block pt-4">
+                           <button 
+                            onClick={() => handleConnectRequest(selectedCrop)}
+                            className="w-full bg-black text-white py-5 rounded-3xl font-black uppercase tracking-[0.2em] text-xs hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-gray-200"
+                           >
+                             {selectedCrop.listingType === 'FIXED' ? 'Buy At Fixed Price' : 'Start Bid Request'}
+                           </button>
+                         </div>
                        </div>
                     </div>
                   ) : (

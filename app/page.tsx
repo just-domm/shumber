@@ -1,7 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
 import { User, UserRole, CropInventory, CropInventoryCreate, AppRoute, Escrow } from '@/app/types/types';
-import { NAKURU_LOCATIONS } from '@/constants';
+import { NAKURU_LOCATIONS } from '../constants';
 import {
   createInventory,
   fetchInventory,

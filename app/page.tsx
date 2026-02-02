@@ -1,7 +1,7 @@
 'use client';
 import React, { useCallback, useEffect, useState } from 'react';
-import { User, UserRole, CropInventory, CropInventoryCreate, AppRoute, Escrow } from '@/types';
-import { INITIAL_INVENTORY } from '@/constants';
+import { User, UserRole, CropInventory, CropInventoryCreate, AppRoute, Escrow } from '@/app/types/types';
+import { NAKURU_LOCATIONS } from '@/constants';
 import {
   createInventory,
   fetchInventory,
@@ -27,7 +27,7 @@ const App: React.FC = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   
-  const [inventory, setInventory] = useState<CropInventory[]>(INITIAL_INVENTORY);
+  const [inventory, setInventory] = useState<CropInventory[]>([]);
   const [route, setRoute] = useState<AppRoute>(AppRoute.MARKETPLACE);
   const [selectedCrop, setSelectedCrop] = useState<CropInventory | null>(null);
   const [drillDownRegion, setDrillDownRegion] = useState<string | null>(null);
@@ -177,11 +177,9 @@ const App: React.FC = () => {
       setIsLoadingInventory(true);
       try {
         const items = await fetchInventory();
-        if (items.length > 0) {
-          setInventory(items);
-        }
+        setInventory(items);
       } catch (error) {
-        console.error('Failed to load inventory, using local data.', error);
+        console.error('Failed to load inventory.', error);
       } finally {
         setIsLoadingInventory(false);
       }
@@ -567,6 +565,8 @@ const App: React.FC = () => {
                     inventory={inventory} 
                     onSelectCrop={setSelectedCrop} 
                     onRegionSelect={setDrillDownRegion} 
+                    defaultCenter={[NAKURU_LOCATIONS[8].lat, NAKURU_LOCATIONS[8].lng]}
+                    defaultZoom={11}
                   />
                   <div className="absolute top-6 left-6 z-[40]">
                     <div className="bg-white px-5 py-2.5 rounded-full shadow-2xl border border-gray-100 flex items-center space-x-3">

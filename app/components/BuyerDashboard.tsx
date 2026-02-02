@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import HeatMap from '@/app/components/HeatMap';
-import { CropInventory, User } from '@/types';
+import { CropInventory, User } from '@/app/types/types';
 
 interface BuyerDashboardProps {
   user: User;

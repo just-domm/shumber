@@ -1,14 +1,22 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
-import { CropInventory } from '@/types';
+import { CropInventory } from '@/app/types/types';
 
 interface HeatMapProps {
   inventory: CropInventory[];
   onSelectCrop: (crop: CropInventory) => void;
   onRegionSelect: (regionName: string) => void;
+  defaultCenter?: [number, number];
+  defaultZoom?: number;
 }
 
-const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSelect }) => {
+const HeatMap: React.FC<HeatMapProps> = ({
+  inventory,
+  onSelectCrop,
+  onRegionSelect,
+  defaultCenter = [-0.3031, 36.0800],
+  defaultZoom = 11
+}) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const heatLayerRef = useRef<any>(null);
@@ -77,7 +85,21 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
         fadeAnimation: true,
         markerZoomAnimation: true,
         scrollWheelZoom: true
-      }).setView([-0.3031, 36.0800], 11);
+      });
+
+      const storedCenter = localStorage.getItem('shumber_map_center');
+      const storedZoom = localStorage.getItem('shumber_map_zoom');
+      if (storedCenter && storedZoom) {
+        try {
+          const parsed = JSON.parse(storedCenter) as [number, number];
+          const zoom = parseInt(storedZoom, 10);
+          mapRef.current.setView(parsed, zoom);
+        } catch {
+          mapRef.current.setView(defaultCenter, defaultZoom);
+        }
+      } else {
+        mapRef.current.setView(defaultCenter, defaultZoom);
+      }
 
       // Add Tile Layer (CartoDB Positron for clean look)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -114,6 +136,33 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
         }
       });
       resizeObserver.observe(mapContainerRef.current);
+
+      // Persist view changes
+      mapRef.current.on('moveend zoomend', () => {
+        if (!mapRef.current) return;
+        const center = mapRef.current.getCenter();
+        localStorage.setItem('shumber_map_center', JSON.stringify([center.lat, center.lng]));
+        localStorage.setItem('shumber_map_zoom', `${mapRef.current.getZoom()}`);
+      });
+
+      // Optional: prefer user location if allowed and no saved view yet
+      if (!storedCenter && navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (!mapRef.current) return;
+            mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], defaultZoom);
+            localStorage.setItem(
+              'shumber_map_center',
+              JSON.stringify([pos.coords.latitude, pos.coords.longitude])
+            );
+            localStorage.setItem('shumber_map_zoom', `${defaultZoom}`);
+          },
+          () => {
+            // ignore if denied/unavailable
+          },
+          { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }
+        );
+      }
 
       return () => {
         resizeObserver.disconnect();

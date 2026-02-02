@@ -1,5 +1,5 @@
 
-import { CropInventory } from '@/types';
+import { CropInventory } from '@/app/types/types';
 
 export const NAKURU_LOCATIONS = [
   { name: 'Molo', lat: -0.2483, lng: 35.7324 },

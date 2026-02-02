@@ -1,4 +1,4 @@
-import { AnalysisResult, CropInventory, CropInventoryCreate, Escrow, Message, User } from '@/types';
+import { AnalysisResult, CropInventory, CropInventoryCreate, Escrow, Message, User } from '@/app/types/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const TOKEN_KEY = 'shamba_token';

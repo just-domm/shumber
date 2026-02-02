@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { fetchMessages, sendMessage } from '@/services/api';
-import { User, CropInventory, Message } from '@/types';
+import { User, CropInventory, Message } from '@/app/types/types';
 
 interface ChatPortalProps {
   currentUser: User;

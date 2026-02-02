@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { releaseEscrow, verifyEscrow } from '@/services/api';
-import { CropInventory, Escrow } from '@/types';
+import { CropInventory, Escrow } from '@/app/types/types';
 
 interface EscrowPortalProps {
   item: CropInventory;

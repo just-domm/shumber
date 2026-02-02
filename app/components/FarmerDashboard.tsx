@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 // Fix: Import User and CropInventory from types.ts where they are defined and exported
 import { NAKURU_LOCATIONS } from '@/constants';
 import { analyzeProduceQuality, fetchMessages } from '@/services/api';
-import { User, CropInventory, CropInventoryCreate, AnalysisResult } from '@/types';
+import { User, CropInventory, CropInventoryCreate, AnalysisResult } from '@/app/types/types';
 
 interface FarmerDashboardProps {
   user: User;

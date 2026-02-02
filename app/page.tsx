@@ -1,7 +1,8 @@
 'use client';
-import React, { useState } from 'react';
-import { User, UserRole, CropInventory, AppRoute } from '@/types';
+import React, { useEffect, useState } from 'react';
+import { User, UserRole, CropInventory, CropInventoryCreate, AppRoute } from '@/types';
 import { INITIAL_INVENTORY } from '@/constants';
+import { createInventory, fetchInventory, login, fetchMe, storeToken, getStoredToken, clearToken } from '@/services/api';
 import HeatMap from '@/app/components/HeatMap';
 import ChatPortal from '@/app/components/ChatPortal';
 import EscrowPortal from '@/app/components/EscrowPortal';
@@ -9,18 +10,26 @@ import FarmerDashboard from '@/app/components/FarmerDashboard';
 
 const App: React.FC = () => {
   const [userRole, setUserRole] = useState<UserRole>(UserRole.BUYER);
-  const [user] = useState<User>({
-    id: 'u123',
-    name: 'Wilson Mwangi',
-    role: UserRole.BUYER,
-    location: 'Nakuru'
-  });
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   
   const [inventory, setInventory] = useState<CropInventory[]>(INITIAL_INVENTORY);
   const [route, setRoute] = useState<AppRoute>(AppRoute.MARKETPLACE);
   const [selectedCrop, setSelectedCrop] = useState<CropInventory | null>(null);
   const [drillDownRegion, setDrillDownRegion] = useState<string | null>(null);
   const [notification, setNotification] = useState<{show: boolean, type: string} | null>(null);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const user: User = authUser || {
+    id: 'guest',
+    name: 'Guest User',
+    role: UserRole.BUYER,
+    location: 'Nakuru'
+  };
 
   const farmersInRegion = drillDownRegion 
     ? inventory.filter(i => i.location.name === drillDownRegion)
@@ -39,12 +48,88 @@ const App: React.FC = () => {
     }, 2500);
   };
 
-  const handleAddInventory = (newItem: CropInventory) => {
-    setInventory([newItem, ...inventory]);
-    setUserRole(UserRole.BUYER); 
-    setRoute(AppRoute.MARKETPLACE);
-    setNotification({ show: true, type: 'ACCEPTED' });
-    setTimeout(() => setNotification(null), 2000);
+  useEffect(() => {
+    const loadInventory = async () => {
+      setIsLoadingInventory(true);
+      try {
+        const items = await fetchInventory();
+        if (items.length > 0) {
+          setInventory(items);
+        }
+      } catch (error) {
+        console.error('Failed to load inventory, using local data.', error);
+      } finally {
+        setIsLoadingInventory(false);
+      }
+    };
+
+    loadInventory();
+  }, []);
+
+  useEffect(() => {
+    const bootstrapAuth = async () => {
+      const stored = getStoredToken();
+      if (!stored) return;
+      setIsAuthLoading(true);
+      try {
+        const me = await fetchMe(stored);
+        setAuthUser(me);
+        setAuthToken(stored);
+        setUserRole(me.role);
+      } catch (error) {
+        clearToken();
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+    bootstrapAuth();
+  }, []);
+
+  const handleLogin = async (): Promise<boolean> => {
+    setAuthError(null);
+    setIsAuthLoading(true);
+    try {
+      const token = await login(loginEmail, loginPassword);
+      storeToken(token.access_token);
+      const me = await fetchMe(token.access_token);
+      setAuthUser(me);
+      setAuthToken(token.access_token);
+      setUserRole(me.role);
+      setLoginPassword('');
+      return true;
+    } catch (error) {
+      setAuthError('Login failed. Check your credentials.');
+      return false;
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    clearToken();
+    setAuthUser(null);
+    setAuthToken(null);
+    setUserRole(UserRole.BUYER);
+  };
+
+  const handleCreateInventory = async (payload: CropInventoryCreate) => {
+    try {
+      if (!authToken) {
+        alert('Please log in as a farmer first.');
+        return null;
+      }
+      const created = await createInventory(authToken, payload);
+      setInventory((prev) => [created, ...prev]);
+      setUserRole(UserRole.BUYER);
+      setRoute(AppRoute.MARKETPLACE);
+      setNotification({ show: true, type: 'ACCEPTED' });
+      setTimeout(() => setNotification(null), 2000);
+      return created;
+    } catch (error) {
+      console.error('Failed to create inventory', error);
+      alert('Posting failed. Please ensure the backend is running.');
+      return null;
+    }
   };
 
   return (
@@ -80,8 +165,62 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center space-x-6">
+          {!authUser ? (
+            <div className="hidden lg:flex items-center space-x-3 bg-gray-900/60 border border-gray-800 rounded-full px-4 py-2">
+              <input
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="email"
+                className="bg-transparent text-xs text-white placeholder-gray-500 outline-none w-40"
+              />
+              <input
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                type="password"
+                placeholder="password"
+                className="bg-transparent text-xs text-white placeholder-gray-500 outline-none w-32"
+              />
+              <button
+                onClick={handleLogin}
+                disabled={isAuthLoading || !loginEmail || !loginPassword}
+                className="bg-white text-black text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full disabled:opacity-40"
+              >
+                {isAuthLoading ? '...' : 'Login'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleLogout}
+              className="bg-gray-800 hover:bg-gray-700 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-gray-700 transition-colors"
+            >
+              Logout
+            </button>
+          )}
+          {!authUser && (
+            <button
+              onClick={() => setShowLogin(true)}
+              className="lg:hidden bg-white text-black text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full"
+            >
+              Login
+            </button>
+          )}
+          {authError && (
+            <span className="hidden lg:inline text-[10px] text-red-400 font-bold uppercase tracking-widest">
+              {authError}
+            </span>
+          )}
           <button 
-            onClick={() => setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER)}
+            onClick={() => {
+              if (!authUser) {
+                alert('Please log in to switch roles.');
+                return;
+              }
+              if (userRole === UserRole.BUYER && authUser.role !== UserRole.FARMER) {
+                alert('This account is not a farmer.');
+                return;
+              }
+              setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER);
+            }}
             className="bg-gray-800 hover:bg-gray-700 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-gray-700 transition-colors"
           >
             Switch to {userRole === UserRole.BUYER ? 'Farmer' : 'Buyer'} View
@@ -93,9 +232,66 @@ const App: React.FC = () => {
       </nav>
 
       <div className="flex-1 relative flex flex-col overflow-hidden">
+        {showLogin && !authUser && (
+          <div className="fixed inset-0 z-[999] bg-black/70 flex items-center justify-center p-6">
+            <div className="bg-white rounded-[28px] p-8 w-full max-w-sm">
+              <h3 className="text-2xl font-black tracking-tight mb-4">Sign in</h3>
+              <div className="space-y-3 mb-4">
+                <input
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="email"
+                  className="w-full bg-gray-100 rounded-2xl p-4 text-sm font-bold"
+                />
+                <input
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  type="password"
+                  placeholder="password"
+                  className="w-full bg-gray-100 rounded-2xl p-4 text-sm font-bold"
+                />
+              </div>
+              {authError && (
+                <p className="text-xs text-red-500 font-bold uppercase tracking-widest mb-3">{authError}</p>
+              )}
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setShowLogin(false)}
+                  className="text-xs font-black text-gray-400 uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    const ok = await handleLogin();
+                    if (ok) setShowLogin(false);
+                  }}
+                  disabled={isAuthLoading || !loginEmail || !loginPassword}
+                  className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full disabled:opacity-40"
+                >
+                  {isAuthLoading ? '...' : 'Login'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {userRole === UserRole.FARMER ? (
           <div className="flex-1 overflow-y-auto">
-            <FarmerDashboard user={{...user, role: UserRole.FARMER}} onAddInventory={handleAddInventory} />
+            {authUser?.role === UserRole.FARMER ? (
+              <FarmerDashboard user={{...user, role: UserRole.FARMER}} onCreateInventory={handleCreateInventory} />
+            ) : (
+              <div className="h-full flex items-center justify-center p-10">
+                <div className="bg-white p-10 rounded-[32px] shadow-xl border border-gray-100 text-center max-w-md">
+                  <h3 className="text-2xl font-black tracking-tight mb-2">Farmer Access Required</h3>
+                  <p className="text-sm text-gray-500 font-medium mb-6">
+                    Log in with a farmer account to post inventory.
+                  </p>
+                  <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">
+                    Demo: mzee@example.com / password123
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex-1 flex flex-col overflow-hidden">
@@ -111,7 +307,9 @@ const App: React.FC = () => {
                   <div className="absolute top-6 left-6 z-[40]">
                     <div className="bg-white px-5 py-2.5 rounded-full shadow-2xl border border-gray-100 flex items-center space-x-3">
                        <div className="w-2.5 h-2.5 bg-black rounded-full animate-pulse"></div>
-                       <span className="text-[11px] font-black uppercase tracking-widest">Live Surplus Hubs</span>
+                       <span className="text-[11px] font-black uppercase tracking-widest">
+                         {isLoadingInventory ? 'Syncing Inventory...' : 'Live Surplus Hubs'}
+                       </span>
                     </div>
                   </div>
                 </div>

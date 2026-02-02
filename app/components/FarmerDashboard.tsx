@@ -2,15 +2,15 @@
 import React, { useState, useRef } from 'react';
 // Fix: Import User and CropInventory from types.ts where they are defined and exported
 import { NAKURU_LOCATIONS } from '@/constants';
-import { analyzeProduceQuality } from '@/services/geminiService';
-import { User, CropInventory, AnalysisResult } from '@/types';
+import { analyzeProduceQuality } from '@/services/api';
+import { User, CropInventory, CropInventoryCreate, AnalysisResult } from '@/types';
 
 interface FarmerDashboardProps {
   user: User;
-  onAddInventory: (item: CropInventory) => void;
+  onCreateInventory: (item: CropInventoryCreate) => Promise<CropInventory | null>;
 }
 
-const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onAddInventory }) => {
+const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInventory }) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -85,30 +85,27 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onAddInventory 
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!analysis || !quantity) return;
     const location = NAKURU_LOCATIONS.find(l => l.name === locationName) || NAKURU_LOCATIONS[0];
     const basePrice = Math.round(analysis.freshnessScore * 0.6); // Dynamic pricing mock
 
-    const newItem: CropInventory = {
-      id: Math.random().toString(36).substr(2, 9),
-      farmerId: user.id,
-      farmerName: user.name,
+    const newItem: CropInventoryCreate = {
       cropName: analysis.cropName,
       quantity: parseInt(quantity),
       qualityScore: analysis.freshnessScore,
       basePrice: basePrice,
       currentBid: basePrice,
       location: location,
-      imageUrl: preview || undefined,
-      timestamp: new Date().toISOString(),
-      status: 'AVAILABLE'
+      imageUrl: preview || undefined
     };
 
-    onAddInventory(newItem);
-    setPreview(null);
-    setAnalysis(null);
-    setQuantity('');
+    const created = await onCreateInventory(newItem);
+    if (created) {
+      setPreview(null);
+      setAnalysis(null);
+      setQuantity('');
+    }
   };
 
   return (

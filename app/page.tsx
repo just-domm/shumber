@@ -40,6 +40,7 @@ const App: React.FC = () => {
   const [pendingRole, setPendingRole] = useState<UserRole | null>(null);
   const [pendingRegion, setPendingRegion] = useState<string | null>(null);
   const [pendingQuantity, setPendingQuantity] = useState<string | null>(null);
+  const [pendingCropSnapshot, setPendingCropSnapshot] = useState<string | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string; tone: 'info' | 'success' | 'error' } | null>(null);
   const user: User = authUser || {
     id: 'guest',
@@ -91,8 +92,10 @@ const App: React.FC = () => {
     if (typeof window === 'undefined') return;
     if (selectedCrop) {
       localStorage.setItem('shumber_selected_crop_id', selectedCrop.id);
+      localStorage.setItem('shumber_selected_crop_snapshot', JSON.stringify(selectedCrop));
     } else {
       localStorage.removeItem('shumber_selected_crop_id');
+      localStorage.removeItem('shumber_selected_crop_snapshot');
     }
   }, [selectedCrop]);
 
@@ -144,6 +147,7 @@ const App: React.FC = () => {
     if (typeof window === 'undefined') return;
     const storedRoute = localStorage.getItem('shumber_route') as AppRoute | null;
     const storedCropId = localStorage.getItem('shumber_selected_crop_id');
+    const storedCropSnapshot = localStorage.getItem('shumber_selected_crop_snapshot');
     const storedRole = localStorage.getItem('shumber_user_role') as UserRole | null;
     const storedRegion = localStorage.getItem('shumber_region');
     const storedQuantity = localStorage.getItem('shumber_request_quantity');
@@ -161,6 +165,9 @@ const App: React.FC = () => {
     }
     if (storedQuantity) {
       setPendingQuantity(storedQuantity);
+    }
+    if (storedCropSnapshot) {
+      setPendingCropSnapshot(storedCropSnapshot);
     }
   }, []);
 
@@ -193,8 +200,22 @@ const App: React.FC = () => {
       setRequestQuantity(pendingQuantity);
     }
     if (!pendingCropId) {
+      if (pendingRoute) {
+        setRoute(pendingRoute);
+      }
+      if (pendingCropSnapshot) {
+        try {
+          const parsed = JSON.parse(pendingCropSnapshot) as CropInventory;
+          setSelectedCrop(parsed);
+        } catch {
+          // ignore malformed snapshot
+        }
+      }
       setPendingRole(null);
       setPendingRegion(null);
+      setPendingQuantity(null);
+      setPendingRoute(null);
+      setPendingCropSnapshot(null);
       return;
     }
     const match = inventory.find((item) => item.id === pendingCropId);
@@ -203,13 +224,24 @@ const App: React.FC = () => {
       if (pendingRoute) {
         setRoute(pendingRoute);
       }
+    } else if (pendingCropSnapshot) {
+      try {
+        const parsed = JSON.parse(pendingCropSnapshot) as CropInventory;
+        setSelectedCrop(parsed);
+        if (pendingRoute) {
+          setRoute(pendingRoute);
+        }
+      } catch {
+        // ignore malformed snapshot
+      }
     }
     setPendingCropId(null);
     setPendingRoute(null);
     setPendingRole(null);
     setPendingRegion(null);
     setPendingQuantity(null);
-  }, [inventory, pendingCropId, pendingRoute, pendingRole, pendingRegion, pendingQuantity]);
+    setPendingCropSnapshot(null);
+  }, [inventory, pendingCropId, pendingRoute, pendingRole, pendingRegion, pendingQuantity, pendingCropSnapshot]);
 
   useEffect(() => {
     if (!selectedCrop) return;
@@ -263,6 +295,7 @@ const App: React.FC = () => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('shumber_route');
       localStorage.removeItem('shumber_selected_crop_id');
+      localStorage.removeItem('shumber_selected_crop_snapshot');
       localStorage.removeItem('shumber_user_role');
       localStorage.removeItem('shumber_region');
       localStorage.removeItem('shumber_request_quantity');
@@ -503,6 +536,7 @@ const App: React.FC = () => {
                 user={{...user, role: UserRole.FARMER}}
                 onCreateInventory={handleCreateInventory}
                 inventory={inventory}
+                authToken={authToken || ''}
                 onOpenChat={(item) => {
                   setSelectedCrop(item);
                   setRoute(AppRoute.NEGOTIATION);

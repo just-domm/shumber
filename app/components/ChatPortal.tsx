@@ -37,6 +37,10 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
           ]);
         } else {
           setMessages(data);
+          const latest = data[data.length - 1];
+          if (latest?.timestamp) {
+            localStorage.setItem(`shumber_last_seen_${connectedWith.id}`, latest.timestamp);
+          }
         }
       } catch (error) {
         console.error('Failed to load messages', error);
@@ -64,6 +68,10 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
         const data = await fetchMessages(connectedWith.id, authToken);
         if (data.length > 0) {
           setMessages(data);
+          const latest = data[data.length - 1];
+          if (latest?.timestamp) {
+            localStorage.setItem(`shumber_last_seen_${connectedWith.id}`, latest.timestamp);
+          }
         }
       } catch (error) {
         console.error('Chat poll failed', error);
@@ -124,16 +132,35 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
             {loadError}
           </div>
         )}
-        {messages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-              msg.senderId === 'system' ? 'bg-gray-200 text-gray-500 text-center mx-auto text-xs font-bold px-4 py-1' :
-              msg.senderId === currentUser.id ? 'bg-black text-white rounded-tr-none' : 'bg-white text-black border border-gray-200 rounded-tl-none shadow-sm'
-            }`}>
-              {msg.text}
+        {messages.map(msg => {
+          const isSystem = msg.senderId === 'system';
+          const isSelf = msg.senderId === currentUser.id;
+          return (
+            <div key={msg.id} className={`flex ${isSystem ? 'justify-center' : isSelf ? 'justify-end' : 'justify-start'}`}>
+              {!isSystem && !isSelf && (
+                <div className="w-8 h-8 rounded-full bg-green-700 text-white flex items-center justify-center text-xs font-black mr-2">
+                  {connectedWith.farmerName?.[0] || 'F'}
+                </div>
+              )}
+              <div
+                className={`max-w-[75%] p-3 rounded-2xl text-sm ${
+                  isSystem
+                    ? 'bg-gray-200 text-gray-500 text-center mx-auto text-xs font-bold px-4 py-1'
+                    : isSelf
+                    ? 'bg-black text-white rounded-tr-none shadow-sm'
+                    : 'bg-white text-black border border-gray-200 rounded-tl-none shadow-sm'
+                }`}
+              >
+                {msg.text}
+              </div>
+              {!isSystem && isSelf && (
+                <div className="w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black ml-2">
+                  {currentUser.name?.[0] || 'U'}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="p-4 border-t border-gray-100 space-y-4 bg-white">

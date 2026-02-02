@@ -12,12 +12,16 @@ interface BuyerDashboardProps {
 const BuyerDashboard: React.FC<BuyerDashboardProps> = ({ user, inventory, onPlaceBid }) => {
   const [selectedCrop, setSelectedCrop] = useState<CropInventory | null>(null);
   const [bidAmount, setBidAmount] = useState<string>('');
+  const toast = (message: string, tone: 'info' | 'success' | 'error' = 'info') => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('shumber-toast', { detail: { message, tone } }));
+  };
 
   const handlePlaceBid = () => {
     if (!selectedCrop || !bidAmount) return;
     const amount = parseInt(bidAmount);
     if (amount <= selectedCrop.currentBid) {
-      alert("Bid must be higher than the current price!");
+      toast("Bid must be higher than the current price!", 'error');
       return;
     }
     onPlaceBid(selectedCrop.id, amount);

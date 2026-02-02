@@ -1,8 +1,8 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 // Fix: Import User and CropInventory from types.ts where they are defined and exported
 import { NAKURU_LOCATIONS } from '@/constants';
-import { analyzeProduceQuality } from '@/services/api';
+import { analyzeProduceQuality, fetchMessages } from '@/services/api';
 import { User, CropInventory, CropInventoryCreate, AnalysisResult } from '@/types';
 
 interface FarmerDashboardProps {
@@ -10,9 +10,10 @@ interface FarmerDashboardProps {
   onCreateInventory: (item: CropInventoryCreate) => Promise<CropInventory | null>;
   inventory: CropInventory[];
   onOpenChat: (item: CropInventory) => void;
+  authToken: string;
 }
 
-const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInventory, inventory, onOpenChat }) => {
+const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInventory, inventory, onOpenChat, authToken }) => {
   const [preview, setPreview] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
@@ -20,6 +21,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
   const [locationName, setLocationName] = useState(NAKURU_LOCATIONS[0].name);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [listingType, setListingType] = useState<'BIDDING' | 'FIXED'>('BIDDING');
+  const [unreadById, setUnreadById] = useState<Record<string, number>>({});
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -28,6 +30,42 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('shumber-toast', { detail: { message, tone } }));
   };
+
+  useEffect(() => {
+    if (!authToken) return;
+    let timer: number | null = null;
+    const poll = async () => {
+      const owned = inventory.filter((item) => item.farmerId === user.id);
+      if (owned.length === 0) {
+        setUnreadById({});
+        return;
+      }
+      try {
+        const updates: Record<string, number> = {};
+        await Promise.all(
+          owned.map(async (item) => {
+            const messages = await fetchMessages(item.id, authToken);
+            const lastSeen = localStorage.getItem(`shumber_last_seen_${item.id}`);
+            const unread = messages.filter(
+              (msg) =>
+                msg.senderId !== user.id &&
+                (!lastSeen || new Date(msg.timestamp).getTime() > new Date(lastSeen).getTime())
+            ).length;
+            updates[item.id] = unread;
+          })
+        );
+        setUnreadById(updates);
+      } catch (error) {
+        console.error('Failed to load unread counts', error);
+      }
+    };
+
+    poll();
+    timer = window.setInterval(poll, 4000);
+    return () => {
+      if (timer) window.clearInterval(timer);
+    };
+  }, [authToken, inventory, user.id]);
 
   const startCamera = async () => {
     try {
@@ -326,12 +364,19 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onCreateInvento
                   <p className="text-sm font-black">{item.cropName}</p>
                   <p className="text-[11px] text-gray-500 font-semibold">{item.location.name}</p>
                 </div>
-                <button
-                  onClick={() => onOpenChat(item)}
-                  className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full"
-                >
-                  Open Chat
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => onOpenChat(item)}
+                    className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full"
+                  >
+                    Open Chat
+                  </button>
+                  {unreadById[item.id] ? (
+                    <span className="bg-green-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full">
+                      {unreadById[item.id]}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             ));
           })()}

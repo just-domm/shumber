@@ -1,0 +1,43 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from ..core.deps import get_current_user, get_db
+from ..models import Inventory, Message, User
+from ..schemas import MessageCreate, MessageOut
+
+router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+@router.get("/{inventory_id}/messages", response_model=list[MessageOut])
+def list_messages(inventory_id: str, db: Session = Depends(get_db)):
+    exists = db.query(Inventory.id).filter(Inventory.id == inventory_id).first()
+    if not exists:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory not found")
+    return (
+        db.query(Message)
+        .filter(Message.inventory_id == inventory_id)
+        .order_by(Message.timestamp.asc())
+        .all()
+    )
+
+
+@router.post("/{inventory_id}/messages", response_model=MessageOut, status_code=status.HTTP_201_CREATED)
+def create_message(
+    inventory_id: str,
+    payload: MessageCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    item = db.query(Inventory).filter(Inventory.id == inventory_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory not found")
+
+    message = Message(
+        inventory_id=inventory_id,
+        sender_id=user.id,
+        text=payload.text,
+    )
+    db.add(message)
+    db.commit()
+    db.refresh(message)
+    return message

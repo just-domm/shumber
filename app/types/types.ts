@@ -70,6 +70,13 @@ export interface AnalysisResult {
   marketInsight: string;
 }
 
+export interface OfflineParseResult {
+  cropName: string;
+  quantity: number;
+  locationName: string;
+  farmerName?: string;
+}
+
 export enum UserRole {
   FARMER = 'FARMER',
   BUYER = 'BUYER'

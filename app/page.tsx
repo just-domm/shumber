@@ -829,12 +829,12 @@ const App: React.FC = () => {
       </div>
 
       <footer className="bg-white border-t border-gray-100 px-4 sm:px-8 md:px-10 py-4 md:py-6 flex flex-wrap justify-between items-center gap-3 text-gray-400 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] z-[60] shrink-0">
-         <div className="flex items-center space-x-8">
+         <div className="flex flex-wrap items-center gap-4 sm:gap-8">
             <p>&copy; {new Date().getFullYear()} Shumber Inc.</p>
-            <a href="#" className="hover:text-black">Safety</a>
-            <a href="#" className="hover:text-black">Escrow Terms</a>
+            <a href="/safety" className="hover:text-black transition-colors">Safety</a>
+            <a href="/escrow-terms" className="hover:text-black transition-colors">Escrow Terms</a>
          </div>
-         <div className="flex items-center space-x-3">
+         <div className="flex flex-wrap items-center gap-3">
             <span className="text-black">Gemini AI Vision Certified</span>
             <div className="w-1 h-1 bg-green-500 rounded-full"></div>
             <span>Nakuru Hub</span>

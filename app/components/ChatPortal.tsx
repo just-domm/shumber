@@ -104,10 +104,10 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] max-w-2xl mx-auto bg-white uber-shadow rounded-2xl overflow-hidden mt-4 animate-fadeIn">
-      <div className="bg-black text-white p-6 flex justify-between items-center">
+    <div className="flex flex-col h-[calc(100vh-160px)] md:h-[calc(100vh-140px)] max-w-2xl mx-4 sm:mx-auto bg-white uber-shadow rounded-2xl overflow-hidden mt-4 animate-fadeIn">
+      <div className="bg-black text-white p-4 sm:p-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-full bg-green-800 flex items-center justify-center font-bold">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-green-800 flex items-center justify-center font-bold">
             {connectedWith.farmerName[0]}
           </div>
           <div>
@@ -115,7 +115,7 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
             <p className="text-xs text-gray-400">Verified Farmer</p>
           </div>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <p className="text-xs text-gray-400 uppercase font-bold tracking-widest">Escrow Total</p>
           <p className="font-bold text-green-400 text-lg">KES {connectedWith.currentBid * connectedWith.quantity}</p>
           {requestedQuantity ? (
@@ -126,7 +126,7 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
         </div>
       </div>
 
-      <div className="flex-1 p-6 overflow-y-auto space-y-4 bg-gray-50">
+      <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 bg-gray-50">
         {loadError && (
           <div className="bg-red-50 text-red-600 text-xs font-bold uppercase tracking-widest rounded-full px-4 py-2 mx-auto">
             {loadError}

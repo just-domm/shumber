@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from .models import EscrowStatus, InventoryStatus, ListingType, UserRole
 
@@ -93,6 +93,24 @@ class AnalysisResult(BaseModel):
     freshnessScore: float
     estimatedShelfLife: str
     marketInsight: str
+
+
+class OfflineParseRequest(BaseModel):
+    text: Optional[str] = None
+    audio_base64: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_payload(self):
+        if not self.text and not self.audio_base64:
+            raise ValueError("Provide text or audio_base64 for offline parsing.")
+        return self
+
+
+class OfflineParseResult(BaseModel):
+    cropName: str
+    quantity: float
+    locationName: str
+    farmerName: Optional[str] = None
 
 
 class MessageCreate(BaseModel):

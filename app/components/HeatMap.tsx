@@ -148,6 +148,12 @@ const HeatMap: React.FC<HeatMapProps> = ({
     }
 
     return () => {
+      if (heatLayerRef.current) {
+        heatLayerRef.current.remove();
+        heatLayerRef.current = null;
+      }
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
       if (resizeObserver) resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
@@ -159,6 +165,7 @@ const HeatMap: React.FC<HeatMapProps> = ({
   useEffect(() => {
     const L = (window as any).L;
     if (!mapRef.current || !L || !libReady || !mapContainerRef.current) return;
+    if (!(mapRef.current as any)._loaded) return;
     const size = mapRef.current.getSize();
     if (size.x === 0 || size.y === 0) {
       window.setTimeout(() => {

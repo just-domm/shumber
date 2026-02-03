@@ -42,6 +42,8 @@ const App: React.FC = () => {
   const [pendingQuantity, setPendingQuantity] = useState<string | null>(null);
   const [pendingCropSnapshot, setPendingCropSnapshot] = useState<string | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string; tone: 'info' | 'success' | 'error' } | null>(null);
+  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
   const user: User = authUser || {
     id: 'guest',
     name: 'Guest User',
@@ -172,19 +174,25 @@ const App: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const loadInventory = async () => {
-      setIsLoadingInventory(true);
-      try {
-        const items = await fetchInventory();
-        setInventory(items);
-      } catch (error) {
-        console.error('Failed to load inventory.', error);
-      } finally {
-        setIsLoadingInventory(false);
+  const loadInventory = async () => {
+    setIsLoadingInventory(true);
+    setInventoryError(null);
+    try {
+      const items = await fetchInventory();
+      setInventory(items);
+      if (items.length === 0) {
+        setInventoryError('No inventory available yet. Ask a farmer to post a listing.');
       }
-    };
+    } catch (error) {
+      console.error('Failed to load inventory.', error);
+      setInventoryError('Unable to fetch inventory. Check if the backend is running.');
+      showToast('Inventory sync failed. Please retry.', 'error');
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  };
 
+  useEffect(() => {
     loadInventory();
   }, []);
 
@@ -322,7 +330,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-gray-50 font-sans overflow-hidden">
+    <div className="flex min-h-screen w-full flex-col bg-gray-50 font-sans overflow-x-hidden">
       {/* Uber-style Toast Notification */}
       {notification?.show && (
         <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[1000] w-full max-w-sm px-6">
@@ -363,16 +371,16 @@ const App: React.FC = () => {
       )}
 
       {/* Global Navbar */}
-      <nav className="bg-black text-white px-8 py-5 flex justify-between items-center z-[60] shadow-2xl shrink-0">
-        <div className="flex items-center space-x-4 cursor-pointer" onClick={() => {setRoute(AppRoute.MARKETPLACE); setDrillDownRegion(null);}}>
+      <nav className="bg-black text-white px-4 md:px-8 py-4 md:py-5 flex flex-wrap justify-between items-center gap-4 z-[60] shadow-2xl shrink-0 relative">
+        <div className="flex items-center space-x-3 md:space-x-4 cursor-pointer" onClick={() => {setRoute(AppRoute.MARKETPLACE); setDrillDownRegion(null);}}>
           <div className="bg-white text-black px-2.5 py-1 rounded-md font-black text-2xl italic tracking-tighter shadow-lg">S</div>
           <div>
             <span className="text-2xl font-black tracking-tighter">Shumber</span>
             <p className="text-[9px] text-green-500 font-black uppercase tracking-[0.2em] leading-none">Uber for harvests</p>
           </div>
         </div>
-        
-        <div className="flex items-center space-x-6">
+
+        <div className="flex items-center gap-3 md:gap-6">
           {!authUser ? (
             <div className="hidden lg:flex items-center space-x-3 bg-gray-900/60 border border-gray-800 rounded-full px-4 py-2">
               <input
@@ -412,34 +420,101 @@ const App: React.FC = () => {
               Login
             </button>
           )}
-          {authError && (
-            <span className="hidden lg:inline text-[10px] text-red-400 font-bold uppercase tracking-widest">
-              {authError}
-            </span>
-          )}
-          <button 
-            onClick={() => {
-              if (!authUser) {
-                showToast('Please log in to switch roles.', 'error');
-                return;
-              }
-              if (userRole === UserRole.BUYER && authUser.role !== UserRole.FARMER) {
-                showToast('This account is not a farmer.', 'error');
-                return;
-              }
-              setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER);
-            }}
-            className="bg-gray-800 hover:bg-gray-700 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-gray-700 transition-colors"
-          >
-            Switch to {userRole === UserRole.BUYER ? 'Farmer' : 'Buyer'} View
-          </button>
-          <div className="h-10 w-10 rounded-full border-2 border-green-800 overflow-hidden shadow-inner">
-             <img src={`https://ui-avatars.com/api/?name=${user.name}&background=000&color=fff&bold=true`} alt="User" />
+          <div className="hidden lg:flex items-center gap-4">
+            {authError && (
+              <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest">
+                {authError}
+              </span>
+            )}
+            <button 
+              onClick={() => {
+                if (!authUser) {
+                  showToast('Please log in to switch roles.', 'error');
+                  return;
+                }
+                if (userRole === UserRole.BUYER && authUser.role !== UserRole.FARMER) {
+                  showToast('This account is not a farmer.', 'error');
+                  return;
+                }
+                setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER);
+              }}
+              className="bg-gray-800 hover:bg-gray-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-3 sm:px-4 py-2 rounded-full border border-gray-700 transition-colors"
+            >
+              Switch to {userRole === UserRole.BUYER ? 'Farmer' : 'Buyer'} View
+            </button>
+            <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full border-2 border-green-800 overflow-hidden shadow-inner">
+               <img src={`https://ui-avatars.com/api/?name=${user.name}&background=000&color=fff&bold=true`} alt="User" />
+            </div>
           </div>
+          <button
+            onClick={() => setIsNavOpen((v) => !v)}
+            className="lg:hidden w-10 h-10 rounded-full border border-gray-700 flex items-center justify-center bg-gray-900/60"
+            aria-label="Open menu"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
         </div>
+        {isNavOpen && (
+          <div className="lg:hidden absolute top-full right-4 mt-3 w-72 bg-black border border-gray-800 rounded-2xl shadow-2xl p-4 space-y-3 z-[70]">
+            {authError && (
+              <div className="text-[10px] text-red-400 font-bold uppercase tracking-widest">
+                {authError}
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full border-2 border-green-800 overflow-hidden shadow-inner">
+                <img src={`https://ui-avatars.com/api/?name=${user.name}&background=000&color=fff&bold=true`} alt="User" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-widest">{user.name}</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-widest">{userRole}</p>
+              </div>
+            </div>
+            {!authUser ? (
+              <button
+                onClick={() => {
+                  setShowLogin(true);
+                  setIsNavOpen(false);
+                }}
+                className="w-full bg-white text-black text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full"
+              >
+                Login
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setIsNavOpen(false);
+                }}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border border-gray-700 transition-colors"
+              >
+                Logout
+              </button>
+            )}
+            <button 
+              onClick={() => {
+                if (!authUser) {
+                  showToast('Please log in to switch roles.', 'error');
+                  return;
+                }
+                if (userRole === UserRole.BUYER && authUser.role !== UserRole.FARMER) {
+                  showToast('This account is not a farmer.', 'error');
+                  return;
+                }
+                setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER);
+                setIsNavOpen(false);
+              }}
+              className="w-full bg-gray-800 hover:bg-gray-700 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border border-gray-700 transition-colors"
+            >
+              Switch to {userRole === UserRole.BUYER ? 'Farmer' : 'Buyer'} View
+            </button>
+          </div>
+        )}
       </nav>
 
-      <div className="flex-1 relative flex flex-col overflow-hidden">
+          <div className="flex-1 relative flex flex-col overflow-hidden">
         {showLogin && !authUser && (
           <div className="fixed inset-0 z-[999] bg-black/70 flex items-center justify-center p-6">
             <div className="bg-white rounded-[28px] p-8 w-full max-w-sm">
@@ -560,7 +635,7 @@ const App: React.FC = () => {
             {route === AppRoute.MARKETPLACE && (
               <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
                 {/* Map Container - Important: set relative and flex-1 */}
-                <div className="flex-1 relative bg-gray-200 min-h-[40vh] lg:min-h-full overflow-hidden">
+                <div className="flex-1 relative bg-gray-200 min-h-[45vh] lg:min-h-full overflow-hidden">
                   <HeatMap 
                     inventory={inventory} 
                     onSelectCrop={setSelectedCrop} 
@@ -568,6 +643,22 @@ const App: React.FC = () => {
                     defaultCenter={[NAKURU_LOCATIONS[8].lat, NAKURU_LOCATIONS[8].lng]}
                     defaultZoom={11}
                   />
+                  {!isLoadingInventory && inventory.length === 0 && (
+                    <div className="absolute inset-0 z-[35] flex items-center justify-center bg-white/60 backdrop-blur-sm">
+                      <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-2xl text-center max-w-sm mx-6">
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-2">No Listings Yet</p>
+                        <p className="text-sm font-semibold text-gray-600">
+                          {inventoryError || 'Inventory is empty. Create a listing as a farmer to populate the heatmap.'}
+                        </p>
+                        <button
+                          onClick={loadInventory}
+                          className="mt-4 bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full"
+                        >
+                          Refresh Inventory
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="absolute top-6 left-6 z-[40]">
                     <div className="bg-white px-5 py-2.5 rounded-full shadow-2xl border border-gray-100 flex items-center space-x-3">
                        <div className="w-2.5 h-2.5 bg-black rounded-full animate-pulse"></div>
@@ -578,7 +669,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="w-full lg:w-[400px] bg-white border-l border-gray-100 overflow-y-auto p-8 space-y-8 shadow-2xl z-50 shrink-0">
+                <div className="w-full lg:w-[420px] bg-white border-l border-gray-100 overflow-y-auto p-5 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 shadow-2xl z-50 shrink-0">
                   {drillDownRegion ? (
                     <div className="animate-slideInRight">
                       <div className="flex items-center justify-between mb-6">
@@ -620,7 +711,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ) : selectedCrop ? (
-                    <div className="animate-fadeIn flex flex-col overflow-y-auto pr-1 pb-28">
+                    <div className="animate-fadeIn flex flex-col overflow-y-auto pr-1 pb-36">
                        <div className="mb-8">
                          <h2 className="text-4xl font-black tracking-tighter mb-1">{selectedCrop.cropName}</h2>
                          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{selectedCrop.farmerName} • Verified Origin</p>
@@ -737,7 +828,7 @@ const App: React.FC = () => {
         )}
       </div>
 
-      <footer className="bg-white border-t border-gray-100 px-10 py-6 flex justify-between items-center text-gray-400 text-[10px] font-black uppercase tracking-[0.2em] z-[60] shrink-0">
+      <footer className="bg-white border-t border-gray-100 px-4 sm:px-8 md:px-10 py-4 md:py-6 flex flex-wrap justify-between items-center gap-3 text-gray-400 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] z-[60] shrink-0">
          <div className="flex items-center space-x-8">
             <p>&copy; {new Date().getFullYear()} Shumber Inc.</p>
             <a href="#" className="hover:text-black">Safety</a>

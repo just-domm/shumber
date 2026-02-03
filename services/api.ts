@@ -1,4 +1,12 @@
-import { AnalysisResult, CropInventory, CropInventoryCreate, Escrow, Message, User } from '@/app/types/types';
+import {
+  AnalysisResult,
+  CropInventory,
+  CropInventoryCreate,
+  Escrow,
+  Message,
+  OfflineParseResult,
+  User
+} from '@/app/types/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const TOKEN_KEY = 'shamba_token';
@@ -133,6 +141,26 @@ export const analyzeProduceQuality = async (imageBase64: string): Promise<Analys
 
   if (!res.ok) {
     throw new Error('Analysis failed');
+  }
+
+  return res.json();
+};
+
+export const parseOfflineMessage = async (payload: {
+  text?: string;
+  audioBase64?: string;
+}): Promise<OfflineParseResult> => {
+  const res = await fetch(`${API_BASE}/analysis/offline`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: payload.text,
+      audio_base64: payload.audioBase64
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error('Offline parsing failed');
   }
 
   return res.json();

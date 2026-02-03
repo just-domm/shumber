@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { NAKURU_LOCATIONS } from '@/constants';
 import { analyzeProduceQuality, fetchMessages } from '@/services/api';
 import { parseOfflineMessage } from '@/services/geminiService';
-import { User, CropInventory, CropInventoryCreate, AnalysisResult } from '@/app/types/types';
+import { User, CropInventory,  AnalysisResult, CropInventoryCreate } from '@/app/types/types';
 
 interface FarmerDashboardProps {
   user: User;

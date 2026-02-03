@@ -4,6 +4,8 @@ import { AnalysisResult } from "@/app/types/types";
 
 
 
+
+
 export const analyzeProduceQuality = async (base64Image: string): Promise<AnalysisResult> => {
   // Always create instance inside the function call to ensure API_KEY is loaded
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });

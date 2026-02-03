@@ -2,8 +2,8 @@
 import React, { useState, useRef } from 'react';
 // Fix: Import User and CropInventory from types.ts where they are defined and exported
 import { NAKURU_LOCATIONS } from '@/constants';
-import { analyzeProduceQuality } from '@/services/geminiService';
-import { User, CropInventory, AnalysisResult } from '@/types';
+import { analyzeProduceQuality, parseOfflineMessage } from '@/services/geminiService';
+import { User, CropInventory } from '@/types';
 
 interface FarmerDashboardProps {
   user: User;
@@ -11,75 +11,105 @@ interface FarmerDashboardProps {
 }
 
 const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onAddInventory }) => {
+  const [activeTab, setActiveTab] = useState<'PHOTO' | 'VOICE'>('PHOTO');
   const [preview, setPreview] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analysis, setAnalysis] = useState<any>(null);
   const [quantity, setQuantity] = useState<string>('');
   const [locationName, setLocationName] = useState(NAKURU_LOCATIONS[0].name);
   const [isCameraActive, setIsCameraActive] = useState(false);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
+  const [voiceInputType, setVoiceInputType] = useState<'TEXT' | 'AUDIO'>('TEXT');
+  const [voiceText, setVoiceText] = useState('');
+  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const startCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' }, 
-        audio: false 
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsCameraActive(true);
       }
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      alert("Could not access camera. Please check permissions.");
-    }
-  };
-
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      setIsCameraActive(false);
-    }
+    } catch (err) { alert("Camera access denied."); }
   };
 
   const capturePhoto = () => {
     if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        setPreview(dataUrl);
-        stopCamera();
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+      setPreview(canvas.toDataURL('image/jpeg'));
+      if (videoRef.current.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+        setIsCameraActive(false);
       }
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result as string);
-      reader.readAsDataURL(selectedFile);
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          setAudioBase64(base64);
+          handleProcessVoice(base64);
+        };
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) { alert("Microphone access denied."); }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
     }
   };
 
-  const handleAnalyze = async () => {
-    if (!preview) return;
+  const handleProcessVoice = async (audioData?: string) => {
     setAnalyzing(true);
     try {
-      const result = await analyzeProduceQuality(preview);
-      setAnalysis(result);
-    } catch (error) {
-      console.error("Analysis failed", error);
-      alert("AI Analysis failed. Please try again with a clearer photo.");
+      let result;
+      if (audioData) {
+        result = await parseOfflineMessage({ data: audioData.split(',')[1], mimeType: 'audio/webm' });
+      } else {
+        result = await parseOfflineMessage(voiceText);
+      }
+      
+      setAnalysis({
+        cropName: result.cropName,
+        freshnessScore: 85,
+        marketInsight: "Reported via AI Voice/SMS Hub",
+        farmerName: result.farmerName
+      });
+      setQuantity(result.quantity.toString());
+      setLocationName(result.locationName);
+    } catch (e) {
+      alert("AI was unable to parse. Please try again or speak clearer.");
     } finally {
       setAnalyzing(false);
     }
@@ -87,188 +117,129 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onAddInventory 
 
   const handleSubmit = () => {
     if (!analysis || !quantity) return;
-    const location = NAKURU_LOCATIONS.find(l => l.name === locationName) || NAKURU_LOCATIONS[0];
-    const basePrice = Math.round(analysis.freshnessScore * 0.6); // Dynamic pricing mock
-
-    const newItem: CropInventory = {
+    const loc = NAKURU_LOCATIONS.find(l => l.name === locationName) || NAKURU_LOCATIONS[0];
+    onAddInventory({
       id: Math.random().toString(36).substr(2, 9),
       farmerId: user.id,
-      farmerName: user.name,
+      farmerName: analysis.farmerName || user.name,
       cropName: analysis.cropName,
       quantity: parseInt(quantity),
-      qualityScore: analysis.freshnessScore,
-      basePrice: basePrice,
-      currentBid: basePrice,
-      location: location,
+      qualityScore: analysis.freshnessScore || 80,
+      basePrice: 40,
+      currentBid: 40,
+      location: loc,
       imageUrl: preview || undefined,
       timestamp: new Date().toISOString(),
-      status: 'AVAILABLE'
-    };
-
-    onAddInventory(newItem);
-    setPreview(null);
+      status: 'AVAILABLE',
+      source: activeTab === 'VOICE' ? (audioBase64 ? 'VOICE' : 'SMS') : 'APP'
+    });
     setAnalysis(null);
-    setQuantity('');
+    setPreview(null);
+    setAudioBase64(null);
   };
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-8 animate-fadeIn">
       <div className="bg-white p-8 rounded-[40px] uber-shadow border border-gray-100">
-        <header className="mb-8">
-          <h2 className="text-4xl font-black tracking-tighter text-black">New Harvest</h2>
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">List your surplus for Nakuru buyers</p>
+        <header className="mb-8 flex justify-between items-end">
+          <div>
+            <h2 className="text-4xl font-black tracking-tighter text-black">List Harvest</h2>
+            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Inclusion Mode Active</p>
+          </div>
+          <div className="flex bg-gray-100 p-1 rounded-2xl">
+            <button onClick={() => setActiveTab('PHOTO')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === 'PHOTO' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>Smart Scan</button>
+            <button onClick={() => setActiveTab('VOICE')} className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === 'VOICE' ? 'bg-black text-white shadow-lg' : 'text-gray-400'}`}>SMS / Voice</button>
+          </div>
         </header>
-        
-        <div className="grid lg:grid-cols-2 gap-12">
-          {/* Capture Section */}
-          <div className="space-y-6">
-            <div className="relative rounded-[32px] overflow-hidden bg-gray-100 aspect-square border-4 border-gray-50 shadow-inner group">
-              {isCameraActive ? (
-                <div className="absolute inset-0">
-                  <video 
-                    ref={videoRef} 
-                    autoPlay 
-                    playsInline 
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 border-[30px] border-black/20 pointer-events-none"></div>
-                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex space-x-4">
-                    <button 
-                      onClick={capturePhoto}
-                      className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-2xl border-4 border-black/10 active:scale-90 transition-transform"
-                    >
-                      <div className="w-10 h-10 rounded-full border-2 border-black"></div>
-                    </button>
-                    <button 
-                      onClick={stopCamera}
-                      className="bg-black/60 backdrop-blur-md text-white p-4 rounded-full"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                </div>
-              ) : preview ? (
-                <div className="relative w-full h-full">
-                  <img src={preview} alt="Produce" className="w-full h-full object-cover" />
-                  {analyzing && (
-                    <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white">
-                      <div className="w-full h-1 bg-green-500 shadow-[0_0_20px_#22c55e] absolute top-0 animate-[bounce_2s_infinite]"></div>
-                      <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mb-4"></div>
-                      <p className="font-black uppercase tracking-widest text-xs">Gemini AI Grading...</p>
-                    </div>
-                  )}
-                  {!analysis && !analyzing && (
-                    <button 
-                      onClick={() => setPreview(null)}
-                      className="absolute top-4 right-4 bg-black/50 text-white p-2 rounded-full"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center space-y-4">
-                   <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center text-gray-400">
-                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                   </div>
-                   <div className="flex flex-col space-y-2 w-full px-8">
-                     <button 
-                       onClick={startCamera}
-                       className="w-full bg-black text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-[1.02] transition-transform"
-                     >
-                       Take Live Photo
-                     </button>
-                     <button 
-                       onClick={() => fileInputRef.current?.click()}
-                       className="w-full bg-gray-200 text-black py-4 rounded-2xl font-black uppercase tracking-widest text-xs"
-                     >
-                       Upload from Gallery
-                     </button>
-                   </div>
-                </div>
-              )}
-            </div>
-            
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              className="hidden" 
-              accept="image/*" 
-            />
-            <canvas ref={canvasRef} className="hidden" />
 
-            {preview && !analysis && !analyzing && (
-              <button 
-                onClick={handleAnalyze}
-                className="w-full bg-green-600 text-white font-black py-5 rounded-[24px] uppercase tracking-[0.2em] text-xs shadow-xl shadow-green-100"
-              >
-                Verify with Gemini AI
-              </button>
+        <div className="grid lg:grid-cols-2 gap-12">
+          <div className="space-y-6">
+            {activeTab === 'PHOTO' ? (
+              <div className="relative rounded-[32px] overflow-hidden bg-gray-100 aspect-square shadow-inner">
+                {isCameraActive ? (
+                  <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                ) : preview ? (
+                  <img src={preview} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <button onClick={startCamera} className="bg-black text-white px-8 py-4 rounded-2xl font-black uppercase text-xs">Open Camera</button>
+                  </div>
+                )}
+                {isCameraActive && <button onClick={capturePhoto} className="absolute bottom-6 left-1/2 -translate-x-1/2 w-16 h-16 bg-white rounded-full border-4 border-black/10 shadow-xl"></button>}
+              </div>
+            ) : (
+              <div className="bg-gray-50 p-8 rounded-[32px] border-2 border-dashed border-gray-200 min-h-[300px] flex flex-col justify-center">
+                <div className="flex space-x-4 mb-6">
+                  <button onClick={() => setVoiceInputType('TEXT')} className={`text-[10px] font-black uppercase ${voiceInputType === 'TEXT' ? 'text-black underline decoration-2' : 'text-gray-400'}`}>SMS Mode</button>
+                  <button onClick={() => setVoiceInputType('AUDIO')} className={`text-[10px] font-black uppercase ${voiceInputType === 'AUDIO' ? 'text-black underline decoration-2' : 'text-gray-400'}`}>Voice Note</button>
+                </div>
+                
+                {voiceInputType === 'TEXT' ? (
+                  <textarea 
+                    value={voiceText}
+                    onChange={e => setVoiceText(e.target.value)}
+                    placeholder="Describe your harvest here..."
+                    className="w-full bg-transparent border-none text-xl font-bold placeholder:text-gray-300 focus:ring-0 min-h-[120px]"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center py-8">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 scale-110' : 'bg-black'}`}>
+                      {isRecording ? (
+                        <button onClick={stopRecording} className="w-8 h-8 bg-white rounded-sm animate-pulse"></button>
+                      ) : (
+                        <button onClick={startRecording} className="text-white">
+                          <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-4 font-black uppercase text-[10px] tracking-widest text-gray-400">
+                      {isRecording ? "Listening... Speak in any language" : "Tap to record voice report"}
+                    </p>
+                  </div>
+                )}
+                
+                {voiceInputType === 'TEXT' && (
+                  <button onClick={() => handleProcessVoice()} disabled={analyzing} className="bg-black text-white py-4 rounded-2xl font-black uppercase text-[10px] mt-4">
+                    {analyzing ? 'AI Parsing...' : 'Process SMS'}
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Details Section */}
           <div className="flex flex-col justify-center">
             {analysis ? (
-              <div className="space-y-8 animate-fadeIn">
-                <div className="p-8 bg-green-50 rounded-[32px] border border-green-100">
-                  <p className="text-[10px] font-black text-green-600 uppercase tracking-[0.3em] mb-4">Gemini Analysis Result</p>
-                  <h3 className="text-3xl font-black text-black mb-1">{analysis.cropName}</h3>
-                  <div className="flex items-center space-x-3 mb-6">
-                    <span className="text-4xl font-black text-green-700">{analysis.freshnessScore}%</span>
-                    <span className="text-[11px] font-bold text-green-600 leading-tight uppercase tracking-widest">Quality<br/>Score</span>
+              <div className="space-y-6 animate-fadeIn">
+                <div className="p-8 bg-black text-white rounded-[32px]">
+                  <p className="text-[10px] font-black text-green-500 uppercase tracking-widest mb-1">AI Data Extraction</p>
+                  <h3 className="text-3xl font-black">{analysis.cropName}</h3>
+                  <p className="text-sm text-gray-400 mt-2 italic">"{analysis.marketInsight}"</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">KG</label>
+                    <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-gray-100 p-4 rounded-2xl font-bold border-none" />
                   </div>
-                  <div className="space-y-2 text-sm text-green-800 font-medium">
-                    <p>• <b>Shelf Life:</b> {analysis.estimatedShelfLife}</p>
-                    <p className="italic font-normal">"{analysis.marketInsight}"</p>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-400 uppercase">Hub</label>
+                    <select value={locationName} onChange={e => setLocationName(e.target.value)} className="w-full bg-gray-100 p-4 rounded-2xl font-bold border-none">
+                      {NAKURU_LOCATIONS.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
+                    </select>
                   </div>
                 </div>
-
-                <div className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Weight (KG)</label>
-                      <input 
-                        type="number"
-                        value={quantity}
-                        onChange={(e) => setQuantity(e.target.value)}
-                        placeholder="500"
-                        className="w-full bg-gray-100 border-none rounded-2xl p-4 font-bold focus:ring-2 focus:ring-black"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Hub Location</label>
-                      <select 
-                        value={locationName}
-                        onChange={(e) => setLocationName(e.target.value)}
-                        className="w-full bg-gray-100 border-none rounded-2xl p-4 font-bold appearance-none cursor-pointer"
-                      >
-                        {NAKURU_LOCATIONS.map(l => <option key={l.name} value={l.name}>{l.name}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={handleSubmit}
-                    disabled={!quantity}
-                    className="w-full bg-black text-white py-5 rounded-[24px] font-black uppercase tracking-[0.2em] text-xs disabled:opacity-20 transition-all"
-                  >
-                    Post to Shumber Hub
-                  </button>
-                </div>
+                <button onClick={handleSubmit} className="w-full bg-green-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest text-xs shadow-xl">Confirm Listing</button>
               </div>
+            ) : preview && !analyzing ? (
+              <button onClick={() => analyzeProduceQuality(preview).then(setAnalysis)} className="bg-green-600 text-white p-10 rounded-[32px] font-black text-xl hover:scale-105 transition-all">Verify Quality with Gemini AI</button>
             ) : (
-              <div className="text-center space-y-4 opacity-30 px-12">
-                <div className="w-16 h-1 bg-gray-200 mx-auto rounded-full"></div>
-                <p className="text-sm font-bold uppercase tracking-widest leading-relaxed">
-                  Upload a photo of your produce to unlock AI quality grading and instant market listing.
-                </p>
+              <div className="text-center opacity-30">
+                <p className="font-bold text-sm uppercase leading-relaxed">Gemini AI Bridge is ready.<br/>Upload a photo or speak to add data to the heatmap.</p>
               </div>
             )}
           </div>
         </div>
       </div>
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 };

@@ -15,10 +15,9 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
   const markersRef = useRef<any[]>([]);
   const [libReady, setLibReady] = useState(false);
 
-  // Dynamically load Leaflet JS, CSS, and Heat Plugin
   useEffect(() => {
     const loadAssets = async () => {
-      // 1. Load CSS if not present
+      // Load Leaflet JS & CSS
       if (!document.getElementById('leaflet-css')) {
         const link = document.createElement('link');
         link.id = 'leaflet-css';
@@ -26,161 +25,89 @@ const HeatMap: React.FC<HeatMapProps> = ({ inventory, onSelectCrop, onRegionSele
         link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
         document.head.appendChild(link);
       }
-
-      // 2. Load Leaflet JS
       if (!(window as any).L) {
-        await new Promise((resolve) => {
-          const script = document.createElement('script');
-          script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-          script.async = true;
-          script.onload = resolve;
-          document.head.appendChild(script);
+        await new Promise(r => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          s.onload = r;
+          document.head.appendChild(s);
         });
       }
-
-      // 3. Load Heatmap Plugin
+      // Load Heatmap Plugin
       if (!(window as any).L.heatLayer) {
-        await new Promise((resolve) => {
-          const script = document.createElement('script');
-          script.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js';
-          script.async = true;
-          script.onload = resolve;
-          document.head.appendChild(script);
+        await new Promise(r => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js';
+          s.onload = r;
+          document.head.appendChild(s);
         });
       }
-
       setLibReady(true);
     };
-
     loadAssets();
   }, []);
 
   useEffect(() => {
     if (!libReady || !mapContainerRef.current || mapRef.current) return;
-
     const L = (window as any).L;
     
-    try {
-      // Initialize Map instance
-      mapRef.current = L.map(mapContainerRef.current, {
-        zoomControl: false,
-        attributionControl: false,
-        fadeAnimation: true,
-        markerZoomAnimation: true,
-        scrollWheelZoom: true
-      }).setView([-0.3031, 36.0800], 11);
+    mapRef.current = L.map(mapContainerRef.current, { 
+      zoomControl: false, 
+      attributionControl: false 
+    }).setView([-0.3031, 36.0800], 11);
 
-      // Add Tile Layer (CartoDB Positron for clean look)
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd'
-      }).addTo(mapRef.current);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(mapRef.current);
 
-      // Force size recalculation after a short delay to fix tile staggering
-      setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.invalidateSize();
-        }
-      }, 250);
+    // Fix staggered tiles with a delay
+    setTimeout(() => {
+      if (mapRef.current) mapRef.current.invalidateSize();
+    }, 400);
 
-      // Robust Resize Handling
-      const resizeObserver = new ResizeObserver(() => {
-        if (mapRef.current) {
-          mapRef.current.invalidateSize();
-        }
-      });
-      resizeObserver.observe(mapContainerRef.current);
-
-      return () => {
-        resizeObserver.disconnect();
-      };
-    } catch (e) {
-      console.error("Leaflet initialization failed", e);
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
+    const ro = new ResizeObserver(() => {
+      if (mapRef.current) mapRef.current.invalidateSize();
+    });
+    ro.observe(mapContainerRef.current);
+    return () => ro.disconnect();
   }, [libReady]);
 
-  // Handle Markers and Heat Layer Update
   useEffect(() => {
     const L = (window as any).L;
     if (!mapRef.current || !L || !libReady) return;
 
-    // 1. Update Heat Layer (Actual zones)
-    if (heatLayerRef.current) {
-      mapRef.current.removeLayer(heatLayerRef.current);
-    }
-
-    const heatPoints = inventory.map(item => [
-      item.location.lat, 
-      item.location.lng, 
-      0.8 // Intensity
-    ]);
-
+    // Heat Layer
+    if (heatLayerRef.current) mapRef.current.removeLayer(heatLayerRef.current);
+    const points = inventory.map(i => [i.location.lat, i.location.lng, 0.7]);
     if (L.heatLayer) {
-      heatLayerRef.current = L.heatLayer(heatPoints, {
-        radius: 40,
-        blur: 25,
-        maxZoom: 13,
-        gradient: {
-          0.2: '#e2e8f0', // Slate 200
-          0.4: '#86efac', // Green 300
-          0.6: '#22c55e', // Green 500
-          0.8: '#16a34a', // Green 600
-          1.0: '#000000'  // Uber Black
-        }
+      heatLayerRef.current = L.heatLayer(points, { 
+        radius: 35, 
+        blur: 20, 
+        gradient: { 0.4: '#86efac', 0.6: '#22c55e', 0.8: '#16a34a', 1.0: '#000000' } 
       }).addTo(mapRef.current);
     }
 
-    // 2. Update Interactive Markers
+    // Markers
     markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    inventory.forEach((item) => {
+    markersRef.current = inventory.map(item => {
       const marker = L.circleMarker([item.location.lat, item.location.lng], {
-        radius: 12,
-        fillColor: '#000',
-        color: '#fff',
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.9,
-        className: 'shumber-marker'
+        radius: 12, fillColor: '#000', color: '#fff', weight: 2, fillOpacity: 0.9
       }).addTo(mapRef.current);
-
-      marker.on('click', (e: any) => {
-        L.DomEvent.stopPropagation(e);
-        if (item.location.name === 'Njoro') {
-          onRegionSelect('Njoro');
-        } else {
-          onSelectCrop(item);
-        }
+      
+      marker.on('click', () => item.location.name === 'Njoro' ? onRegionSelect('Njoro') : onSelectCrop(item));
+      
+      const sourceTag = item.source ? `<span style="color:#22c55e; font-size:8px;">● ${item.source}</span>` : '';
+      marker.bindTooltip(`<b>${item.farmerName}</b> ${sourceTag}<br/>${item.cropName}`, { 
+        className: 'uber-tooltip', 
+        direction: 'top', 
+        offset: [0, -10] 
       });
-
-      marker.bindTooltip(`<b>${item.farmerName}</b><br/>${item.cropName}`, {
-        direction: 'top',
-        className: 'uber-tooltip',
-        offset: [0, -10]
-      });
-
-      markersRef.current.push(marker);
+      return marker;
     });
-  }, [inventory, onSelectCrop, onRegionSelect, libReady]);
+  }, [inventory, libReady]);
 
-  return (
-    <div 
-      ref={mapContainerRef} 
-      className="absolute inset-0 w-full h-full bg-[#f3f4f6]"
-      style={{ 
-        minHeight: '400px',
-        overflow: 'hidden'
-      }}
-    />
-  );
+  return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full bg-[#f3f4f6] overflow-hidden" />;
 };
 
 export default HeatMap;

@@ -1,4 +1,3 @@
-
 export enum UserRole {
   FARMER = 'FARMER',
   BUYER = 'BUYER'
@@ -37,6 +36,7 @@ export interface CropInventory {
   timestamp: string;
   status: 'AVAILABLE' | 'NEGOTIATING' | 'SOLD';
   listingType: 'BIDDING' | 'FIXED';
+  source?: 'APP' | 'SMS' | 'VOICE'; // For tracking offline ingestion
 }
 
 export interface CropInventoryCreate {

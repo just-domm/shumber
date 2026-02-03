@@ -14,7 +14,7 @@ const HeatMap: React.FC<HeatMapProps> = ({
   inventory,
   onSelectCrop,
   onRegionSelect,
-  defaultCenter = [-0.3031, 36.0800],
+  defaultCenter = [-0.3031, 36.08],
   defaultZoom = 11
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -25,11 +25,10 @@ const HeatMap: React.FC<HeatMapProps> = ({
   const lastInventoryKeyRef = useRef<string>('');
   const lastSizeRef = useRef<{ width: number; height: number } | null>(null);
   const lastHeatPointsRef = useRef<number[][]>([]);
+  const [initTick, setInitTick] = useState(0);
 
-  // Dynamically load Leaflet JS, CSS, and Heat Plugin
   useEffect(() => {
     const loadAssets = async () => {
-      // 1. Load CSS if not present
       if (!document.getElementById('leaflet-css')) {
         const link = document.createElement('link');
         link.id = 'leaflet-css';
@@ -37,36 +36,26 @@ const HeatMap: React.FC<HeatMapProps> = ({
         link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
         document.head.appendChild(link);
       }
-
-      // 2. Load Leaflet JS
       if (!(window as any).L) {
-        await new Promise((resolve) => {
-          const script = document.createElement('script');
-          script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-          script.async = true;
-          script.onload = resolve;
-          document.head.appendChild(script);
+        await new Promise((r) => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          s.onload = r;
+          document.head.appendChild(s);
         });
       }
-
-      // 3. Load Heatmap Plugin
       if (!(window as any).L.heatLayer) {
-        await new Promise((resolve) => {
-          const script = document.createElement('script');
-          script.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js';
-          script.async = true;
-          script.onload = resolve;
-          document.head.appendChild(script);
+        await new Promise((r) => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js';
+          s.onload = r;
+          document.head.appendChild(s);
         });
       }
-
       setLibReady(true);
     };
-
     loadAssets();
   }, []);
-
-  const [initTick, setInitTick] = useState(0);
 
   useEffect(() => {
     if (!libReady || !mapContainerRef.current || mapRef.current) return;
@@ -76,9 +65,9 @@ const HeatMap: React.FC<HeatMapProps> = ({
     }
 
     const L = (window as any).L;
-    
+    let resizeObserver: ResizeObserver | null = null;
+
     try {
-      // Initialize Map instance
       mapRef.current = L.map(mapContainerRef.current, {
         zoomControl: false,
         attributionControl: false,
@@ -101,21 +90,16 @@ const HeatMap: React.FC<HeatMapProps> = ({
         mapRef.current.setView(defaultCenter, defaultZoom);
       }
 
-      // Add Tile Layer (CartoDB Positron for clean look)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19,
-        subdomains: 'abcd'
+        subdomains: 'abcd',
+        maxZoom: 19
       }).addTo(mapRef.current);
 
-      // Force size recalculation after a short delay to fix tile staggering
       setTimeout(() => {
-        if (mapRef.current) {
-          mapRef.current.invalidateSize();
-        }
-      }, 250);
+        if (mapRef.current) mapRef.current.invalidateSize();
+      }, 400);
 
-      // Robust Resize Handling
-      const resizeObserver = new ResizeObserver((entries) => {
+      resizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0];
         if (!entry || !mapRef.current) return;
         const { width, height } = entry.contentRect;
@@ -137,7 +121,6 @@ const HeatMap: React.FC<HeatMapProps> = ({
       });
       resizeObserver.observe(mapContainerRef.current);
 
-      // Persist view changes
       mapRef.current.on('moveend zoomend', () => {
         if (!mapRef.current) return;
         const center = mapRef.current.getCenter();
@@ -145,7 +128,6 @@ const HeatMap: React.FC<HeatMapProps> = ({
         localStorage.setItem('shumber_map_zoom', `${mapRef.current.getZoom()}`);
       });
 
-      // Optional: prefer user location if allowed and no saved view yet
       if (!storedCenter && navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (pos) => {
@@ -157,33 +139,26 @@ const HeatMap: React.FC<HeatMapProps> = ({
             );
             localStorage.setItem('shumber_map_zoom', `${defaultZoom}`);
           },
-          () => {
-            // ignore if denied/unavailable
-          },
+          () => {},
           { enableHighAccuracy: true, maximumAge: 60000, timeout: 5000 }
         );
       }
-
-      return () => {
-        resizeObserver.disconnect();
-      };
     } catch (e) {
-      console.error("Leaflet initialization failed", e);
+      console.error('Leaflet initialization failed', e);
     }
 
     return () => {
+      if (resizeObserver) resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
       }
     };
-  }, [libReady, initTick]);
+  }, [libReady, initTick, defaultCenter, defaultZoom]);
 
-  // Handle Markers and Heat Layer Update
   useEffect(() => {
     const L = (window as any).L;
-    if (!mapRef.current || !L || !libReady) return;
-    if (!mapContainerRef.current) return;
+    if (!mapRef.current || !L || !libReady || !mapContainerRef.current) return;
     const size = mapRef.current.getSize();
     if (size.x === 0 || size.y === 0) {
       window.setTimeout(() => {
@@ -197,17 +172,15 @@ const HeatMap: React.FC<HeatMapProps> = ({
     const inventoryKey = inventory
       .map(
         (item) =>
-          `${item.id}:${item.location.lat},${item.location.lng}:${item.quantity}:${item.cropName}`
+          `${item.id}:${item.location.lat},${item.location.lng}:${item.quantity}:${item.cropName}:${item.farmerName}:${
+            item.source || ''
+          }`
       )
       .join('|');
     if (inventoryKey === lastInventoryKeyRef.current) return;
     lastInventoryKeyRef.current = inventoryKey;
 
-    const heatPoints = inventory.map(item => [
-      item.location.lat,
-      item.location.lng,
-      0.8
-    ]);
+    const heatPoints = inventory.map((item) => [item.location.lat, item.location.lng, 0.8]);
     lastHeatPointsRef.current = heatPoints;
 
     if (L.heatLayer) {
@@ -236,49 +209,29 @@ const HeatMap: React.FC<HeatMapProps> = ({
       }
     }
 
-    markersRef.current.forEach(m => m.remove());
-    markersRef.current = [];
-
-    inventory.forEach((item) => {
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = inventory.map((item) => {
       const marker = L.circleMarker([item.location.lat, item.location.lng], {
         radius: 12,
         fillColor: '#000',
         color: '#fff',
-        weight: 3,
-        opacity: 1,
-        fillOpacity: 0.9,
-        className: 'shumber-marker'
+        weight: 2,
+        fillOpacity: 0.9
       }).addTo(mapRef.current);
 
-      marker.on('click', (e: any) => {
-        L.DomEvent.stopPropagation(e);
-        if (item.location.name === 'Njoro') {
-          onRegionSelect('Njoro');
-        } else {
-          onSelectCrop(item);
-        }
-      });
+      marker.on('click', () => (item.location.name === 'Njoro' ? onRegionSelect('Njoro') : onSelectCrop(item)));
 
-      marker.bindTooltip(`<b>${item.farmerName}</b><br/>${item.cropName}`, {
-        direction: 'top',
+      const sourceTag = item.source ? `<span style=\"color:#22c55e; font-size:8px;\">● ${item.source}</span>` : '';
+      marker.bindTooltip(`<b>${item.farmerName}</b> ${sourceTag}<br/>${item.cropName}`, {
         className: 'uber-tooltip',
+        direction: 'top',
         offset: [0, -10]
       });
-
-      markersRef.current.push(marker);
+      return marker;
     });
-  }, [inventory, onSelectCrop, onRegionSelect, libReady]);
+  }, [inventory, libReady, onRegionSelect, onSelectCrop]);
 
-  return (
-    <div 
-      ref={mapContainerRef} 
-      className="absolute inset-0 w-full h-full bg-[#f3f4f6]"
-      style={{ 
-        minHeight: '400px',
-        overflow: 'hidden'
-      }}
-    />
-  );
+  return <div ref={mapContainerRef} className="absolute inset-0 w-full h-full bg-[#f3f4f6] overflow-hidden" />;
 };
 
 export default HeatMap;

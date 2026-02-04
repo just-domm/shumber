@@ -60,6 +60,7 @@ const App: React.FC = () => {
   const lastSelectedIdRef = useRef<string | null>(null);
 
   const handleConnectRequest = (crop: CropInventory) => {
+    const normalizedQuantity = requestQuantity ? requestQuantity : `${crop.quantity}`;
     setSelectedCrop(crop);
     setNotification({ show: true, type: 'REQUESTING' });
     
@@ -68,6 +69,7 @@ const App: React.FC = () => {
       setTimeout(() => {
         setNotification(null);
         setRoute(AppRoute.NEGOTIATION);
+        setRequestQuantity(normalizedQuantity);
       }, 1500);
     }, 2500);
   };

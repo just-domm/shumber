@@ -13,12 +13,24 @@ def list_messages(inventory_id: str, db: Session = Depends(get_db)):
     exists = db.query(Inventory.id).filter(Inventory.id == inventory_id).first()
     if not exists:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory not found")
-    return (
-        db.query(Message)
+    results = (
+        db.query(Message, User.name)
+        .join(User, User.id == Message.sender_id)
         .filter(Message.inventory_id == inventory_id)
         .order_by(Message.timestamp.asc())
         .all()
     )
+    return [
+        MessageOut(
+            id=msg.id,
+            inventory_id=msg.inventory_id,
+            sender_id=msg.sender_id,
+            text=msg.text,
+            timestamp=msg.timestamp,
+            sender_name=sender_name,
+        )
+        for msg, sender_name in results
+    ]
 
 
 @router.post("/{inventory_id}/messages", response_model=MessageOut, status_code=status.HTTP_201_CREATED)
@@ -40,4 +52,11 @@ def create_message(
     db.add(message)
     db.commit()
     db.refresh(message)
-    return message
+    return MessageOut(
+        id=message.id,
+        inventory_id=message.inventory_id,
+        sender_id=message.sender_id,
+        text=message.text,
+        timestamp=message.timestamp,
+        sender_name=user.name,
+    )

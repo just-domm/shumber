@@ -687,7 +687,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="w-full lg:w-[420px] bg-white border-l border-gray-100 overflow-y-auto p-5 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 shadow-2xl z-50 shrink-0">
+                <div className="w-full lg:w-[420px] bg-white border-l border-gray-100 overflow-y-auto p-5 sm:p-6 lg:p-8 space-y-6 sm:space-y-8 shadow-2xl z-50 shrink-0 max-h-[calc(100vh-120px)] lg:max-h-none">
                   {drillDownRegion ? (
                     <div className="animate-slideInRight">
                       <div className="flex items-center justify-between mb-6">
@@ -729,7 +729,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                   ) : selectedCrop ? (
-                    <div className="animate-fadeIn flex flex-col overflow-y-auto pr-1 pb-36">
+                    <div className="animate-fadeIn flex flex-col overflow-y-auto pr-1 pb-36 max-h-[calc(100vh-260px)] lg:max-h-none">
                        <div className="mb-8">
                          <h2 className="text-4xl font-black tracking-tighter mb-1">{selectedCrop.cropName}</h2>
                          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{selectedCrop.farmerName} • Verified Origin</p>

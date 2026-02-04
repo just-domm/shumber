@@ -123,6 +123,7 @@ class MessageOut(BaseModel):
     sender_id: str
     text: str
     timestamp: datetime
+    sender_name: Optional[str] = None
 
     class Config:
         from_attributes = True

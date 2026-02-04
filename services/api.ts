@@ -31,6 +31,7 @@ const mapInventory = (item: any): CropInventory => ({
 const mapMessage = (item: any): Message => ({
   id: item.id,
   senderId: item.sender_id ?? item.senderId,
+  senderName: item.sender_name ?? item.senderName,
   text: item.text,
   timestamp: item.timestamp
 });

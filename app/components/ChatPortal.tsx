@@ -137,11 +137,14 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
         {messages.map(msg => {
           const isSystem = msg.senderId === 'system';
           const isSelf = msg.senderId === currentUser.id;
+          const displayName = isSystem
+            ? 'System'
+            : msg.senderName || (isSelf ? currentUser.name : connectedWith.farmerName);
           return (
             <div key={msg.id} className={`flex ${isSystem ? 'justify-center' : isSelf ? 'justify-end' : 'justify-start'}`}>
               {!isSystem && !isSelf && (
                 <div className="w-8 h-8 rounded-full bg-green-700 text-white flex items-center justify-center text-xs font-black mr-2">
-                  {connectedWith.farmerName?.[0] || 'F'}
+                  {displayName?.[0] || 'U'}
                 </div>
               )}
               <div
@@ -153,6 +156,11 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
                     : 'bg-white text-black border border-gray-200 rounded-tl-none shadow-sm'
                 }`}
               >
+                {!isSystem && (
+                  <div className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${isSelf ? 'text-gray-300' : 'text-gray-400'}`}>
+                    {displayName}
+                  </div>
+                )}
                 {msg.text}
               </div>
               {!isSystem && isSelf && (

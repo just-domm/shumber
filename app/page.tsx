@@ -1,5 +1,5 @@
 'use client';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { User, UserRole, CropInventory, CropInventoryCreate, AppRoute, Escrow } from '@/app/types/types';
 import { NAKURU_LOCATIONS } from '../constants';
 import {
@@ -58,9 +58,10 @@ const App: React.FC = () => {
     ? inventory.filter(i => i.location.name === drillDownRegion)
     : [];
 
+  const lastSelectedIdRef = useRef<string | null>(null);
+
   const handleConnectRequest = (crop: CropInventory) => {
     setSelectedCrop(crop);
-    setRequestQuantity('');
     setNotification({ show: true, type: 'REQUESTING' });
     
     setTimeout(() => {
@@ -245,9 +246,15 @@ const App: React.FC = () => {
   }, [inventory, pendingCropId, pendingRoute, pendingRole, pendingRegion, pendingQuantity, pendingCropSnapshot]);
 
   useEffect(() => {
-    if (!selectedCrop) return;
-    setRequestQuantity('');
-    setBidAmount('');
+    if (!selectedCrop) {
+      lastSelectedIdRef.current = null;
+      return;
+    }
+    if (lastSelectedIdRef.current !== selectedCrop.id) {
+      setRequestQuantity('');
+      setBidAmount('');
+      lastSelectedIdRef.current = selectedCrop.id;
+    }
   }, [selectedCrop]);
 
   useEffect(() => {

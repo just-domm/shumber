@@ -30,11 +30,15 @@ const HeatMap: React.FC<HeatMapProps> = ({
   useEffect(() => {
     const loadAssets = async () => {
       if (!document.getElementById('leaflet-css')) {
-        const link = document.createElement('link');
-        link.id = 'leaflet-css';
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
+        await new Promise((r) => {
+          const link = document.createElement('link');
+          link.id = 'leaflet-css';
+          link.rel = 'stylesheet';
+          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+          link.onload = r;
+          link.onerror = r;
+          document.head.appendChild(link);
+        });
       }
       if (!(window as any).L) {
         await new Promise((r) => {
@@ -95,9 +99,22 @@ const HeatMap: React.FC<HeatMapProps> = ({
         maxZoom: 19
       }).addTo(mapRef.current);
 
-      setTimeout(() => {
-        if (mapRef.current) mapRef.current.invalidateSize();
-      }, 400);
+      const scheduleInvalidate = () => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      };
+      window.setTimeout(scheduleInvalidate, 50);
+      window.setTimeout(scheduleInvalidate, 400);
+      window.setTimeout(scheduleInvalidate, 1200);
+
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible') {
+          scheduleInvalidate();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
+      window.addEventListener('resize', scheduleInvalidate);
 
       resizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0];
@@ -148,6 +165,8 @@ const HeatMap: React.FC<HeatMapProps> = ({
     }
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('resize', scheduleInvalidate);
       if (heatLayerRef.current) {
         heatLayerRef.current.remove();
         heatLayerRef.current = null;

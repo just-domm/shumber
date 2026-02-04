@@ -87,7 +87,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('shumber_route', route);
+    if (route === AppRoute.MARKETPLACE) {
+      localStorage.setItem('shumber_route', route);
+    } else {
+      localStorage.removeItem('shumber_route');
+    }
   }, [route]);
 
   useEffect(() => {
@@ -207,16 +211,8 @@ const App: React.FC = () => {
       setRequestQuantity(pendingQuantity);
     }
     if (!pendingCropId) {
-      if (pendingRoute) {
+      if (pendingRoute && pendingRoute === AppRoute.MARKETPLACE) {
         setRoute(pendingRoute);
-      }
-      if (pendingCropSnapshot) {
-        try {
-          const parsed = JSON.parse(pendingCropSnapshot) as CropInventory;
-          setSelectedCrop(parsed);
-        } catch {
-          // ignore malformed snapshot
-        }
       }
       setPendingRole(null);
       setPendingRegion(null);
@@ -231,15 +227,10 @@ const App: React.FC = () => {
       if (pendingRoute) {
         setRoute(pendingRoute);
       }
-    } else if (pendingCropSnapshot) {
-      try {
-        const parsed = JSON.parse(pendingCropSnapshot) as CropInventory;
-        setSelectedCrop(parsed);
-        if (pendingRoute) {
-          setRoute(pendingRoute);
-        }
-      } catch {
-        // ignore malformed snapshot
+    } else {
+      setSelectedCrop(null);
+      if (route !== AppRoute.MARKETPLACE) {
+        setRoute(AppRoute.MARKETPLACE);
       }
     }
     setPendingCropId(null);
@@ -254,6 +245,17 @@ const App: React.FC = () => {
     if (!selectedCrop) return;
     setRequestQuantity('');
   }, [selectedCrop]);
+
+  useEffect(() => {
+    if (!selectedCrop) return;
+    const stillExists = inventory.some((item) => item.id === selectedCrop.id);
+    if (!stillExists) {
+      setSelectedCrop(null);
+      if (route !== AppRoute.MARKETPLACE) {
+        setRoute(AppRoute.MARKETPLACE);
+      }
+    }
+  }, [inventory, route, selectedCrop]);
 
   useEffect(() => {
     const bootstrapAuth = async () => {

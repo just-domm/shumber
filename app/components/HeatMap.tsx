@@ -70,6 +70,8 @@ const HeatMap: React.FC<HeatMapProps> = ({
 
     const L = (window as any).L;
     let resizeObserver: ResizeObserver | null = null;
+    let scheduleInvalidate: (() => void) | null = null;
+    let handleVisibility: (() => void) | null = null;
 
     try {
       mapRef.current = L.map(mapContainerRef.current, {
@@ -99,7 +101,7 @@ const HeatMap: React.FC<HeatMapProps> = ({
         maxZoom: 19
       }).addTo(mapRef.current);
 
-      const scheduleInvalidate = () => {
+      scheduleInvalidate = () => {
         if (mapRef.current) {
           mapRef.current.invalidateSize();
         }
@@ -108,8 +110,8 @@ const HeatMap: React.FC<HeatMapProps> = ({
       window.setTimeout(scheduleInvalidate, 400);
       window.setTimeout(scheduleInvalidate, 1200);
 
-      const handleVisibility = () => {
-        if (document.visibilityState === 'visible') {
+      handleVisibility = () => {
+        if (document.visibilityState === 'visible' && scheduleInvalidate) {
           scheduleInvalidate();
         }
       };
@@ -165,8 +167,12 @@ const HeatMap: React.FC<HeatMapProps> = ({
     }
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('resize', scheduleInvalidate);
+      if (handleVisibility) {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
+      if (scheduleInvalidate) {
+        window.removeEventListener('resize', scheduleInvalidate);
+      }
       if (heatLayerRef.current) {
         heatLayerRef.current.remove();
         heatLayerRef.current = null;

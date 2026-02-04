@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Shumber - Uber for Harvests",
   description: "Uber for Harvests",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

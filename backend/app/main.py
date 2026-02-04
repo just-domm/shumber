@@ -45,6 +45,12 @@ def on_startup() -> None:
                     "ADD COLUMN IF NOT EXISTS listing_type listing_type DEFAULT 'BIDDING'"
                 )
             )
+            connection.execute(
+                text(
+                    "ALTER TABLE escrow "
+                    "ADD COLUMN IF NOT EXISTS requested_quantity INTEGER"
+                )
+            )
     with SessionLocal() as db:
         seed_data(db)
 

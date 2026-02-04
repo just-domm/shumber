@@ -559,6 +559,32 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
 
       <div className="bg-white p-6 sm:p-7 md:p-8 rounded-[32px] md:rounded-[40px] uber-shadow border border-gray-100 mt-6 md:mt-8">
         <header className="mb-6">
+          <h3 className="text-2xl font-black tracking-tighter text-black">Completed Sales</h3>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Recently released escrows.
+          </p>
+        </header>
+        <div className="space-y-3">
+          {(() => {
+            const sold = inventory.filter((item) => item.farmerId === user.id && item.status === 'SOLD');
+            if (sold.length === 0) {
+              return <p className="text-sm text-gray-400">No completed sales yet.</p>;
+            }
+            return sold.slice(0, 4).map((item) => (
+              <div key={item.id} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                <p className="text-sm font-black">{item.cropName}</p>
+                <p className="text-[11px] text-gray-500 font-semibold">{item.location.name}</p>
+                <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                  KES {item.currentBid} • {item.quantity} Kg
+                </p>
+              </div>
+            ));
+          })()}
+        </div>
+      </div>
+
+      <div className="bg-white p-6 sm:p-7 md:p-8 rounded-[32px] md:rounded-[40px] uber-shadow border border-gray-100 mt-6 md:mt-8">
+        <header className="mb-6">
           <h3 className="text-2xl font-black tracking-tighter text-black">Market Heatmap</h3>
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
             Read-only view for active listings.

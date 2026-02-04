@@ -99,6 +99,11 @@ const EscrowPortal: React.FC<EscrowPortalProps> = ({ item, authToken, escrow, on
               <p className="text-gray-500 mt-2 text-sm">
                 Quality matches Gemini score of {item.qualityScore}%. Authorized to release KES {escrow?.amount ?? item.currentBid * item.quantity}.
               </p>
+              {escrow?.requestedQuantity ? (
+                <p className="text-xs text-gray-400 mt-2 font-semibold uppercase tracking-widest">
+                  Quantity locked: {escrow.requestedQuantity} Kg
+                </p>
+              ) : null}
             </div>
             <button 
               onClick={handleRelease}

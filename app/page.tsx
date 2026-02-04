@@ -56,6 +56,9 @@ const App: React.FC = () => {
   const farmersInRegion = drillDownRegion 
     ? inventory.filter(i => i.location.name === drillDownRegion)
     : [];
+  const completedPurchases = authUser
+    ? inventory.filter((item) => item.status === 'SOLD' && item.highestBidderId === authUser.id)
+    : [];
 
   const lastSelectedIdRef = useRef<string | null>(null);
 
@@ -140,7 +143,7 @@ const App: React.FC = () => {
         Math.min(selectedCrop.quantity, parseInt(requestQuantity || `${selectedCrop.quantity}`, 10))
       );
       const amount = selectedCrop.currentBid * quantity;
-      const created = await startEscrow(selectedCrop.id, authToken, amount);
+      const created = await startEscrow(selectedCrop.id, authToken, amount, quantity);
       setEscrow(created);
       setRoute(AppRoute.ESCROW);
     } catch (error) {
@@ -610,11 +613,7 @@ const App: React.FC = () => {
                   escrow={escrow}
                   onRelease={() => {
                     showToast(`M-PESA B2B SUCCESS: Funds released to ${selectedCrop.farmerName}`, 'success');
-                    setInventory((prev) =>
-                      prev.map((item) =>
-                        item.id === selectedCrop.id ? { ...item, status: 'SOLD' } : item
-                      )
-                    );
+                    loadInventory();
                     setRoute(AppRoute.MARKETPLACE);
                     setDrillDownRegion(null);
                     setSelectedCrop(null);
@@ -815,6 +814,25 @@ const App: React.FC = () => {
                        <p className="font-black uppercase tracking-widest text-[10px]">Select a sector or harvest pin to begin</p>
                     </div>
                   )}
+
+                  <div className="bg-gray-50 border border-gray-200 rounded-3xl p-5">
+                    <h3 className="text-sm font-black uppercase tracking-widest text-gray-500 mb-3">Successful Bids</h3>
+                    {completedPurchases.length === 0 ? (
+                      <p className="text-xs text-gray-400 font-semibold">No completed purchases yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {completedPurchases.slice(0, 4).map((item) => (
+                          <div key={item.id} className="bg-white rounded-2xl p-3 border border-gray-100">
+                            <p className="text-sm font-black">{item.cropName}</p>
+                            <p className="text-[11px] text-gray-500 font-semibold">{item.farmerName}</p>
+                            <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                              KES {item.currentBid} • {item.quantity} Kg
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -851,11 +869,7 @@ const App: React.FC = () => {
                   escrow={escrow}
                   onRelease={() => {
                     showToast(`M-PESA B2B SUCCESS: Funds released to ${selectedCrop.farmerName}`, 'success');
-                    setInventory((prev) =>
-                      prev.map((item) =>
-                        item.id === selectedCrop.id ? { ...item, status: 'SOLD' } : item
-                      )
-                    );
+                    loadInventory();
                     setRoute(AppRoute.MARKETPLACE);
                     setDrillDownRegion(null);
                     setSelectedCrop(null);

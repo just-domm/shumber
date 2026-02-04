@@ -131,6 +131,7 @@ class MessageOut(BaseModel):
 
 class EscrowStart(BaseModel):
     amount: Optional[int] = None
+    quantity: Optional[int] = Field(default=None, gt=0)
 
 
 class BidCreate(BaseModel):
@@ -147,6 +148,7 @@ class EscrowOut(BaseModel):
     inventory_id: str
     buyer_id: str
     amount: int
+    requested_quantity: Optional[int] = None
     status: EscrowStatus
     created_at: datetime
     updated_at: datetime

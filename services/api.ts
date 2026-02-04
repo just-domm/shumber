@@ -41,6 +41,7 @@ const mapEscrow = (item: any): Escrow => ({
   inventoryId: item.inventory_id ?? item.inventoryId,
   buyerId: item.buyer_id ?? item.buyerId,
   amount: item.amount,
+  requestedQuantity: item.requested_quantity ?? item.requestedQuantity ?? undefined,
   status: item.status,
   createdAt: item.created_at ?? item.createdAt,
   updatedAt: item.updated_at ?? item.updatedAt
@@ -241,7 +242,8 @@ export const sendMessage = async (
 export const startEscrow = async (
   inventoryId: string,
   token: string,
-  amount?: number
+  amount?: number,
+  quantity?: number
 ): Promise<Escrow> => {
   const res = await fetch(`${API_BASE}/escrow/${inventoryId}/start`, {
     method: 'POST',
@@ -249,7 +251,7 @@ export const startEscrow = async (
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ amount })
+    body: JSON.stringify({ amount, quantity })
   });
   if (!res.ok) {
     let detail = 'Failed to start escrow';

@@ -8,6 +8,7 @@ interface FarmerDashboardProps {
   onCreateInventory: (item: CropInventoryCreate) => Promise<CropInventory | null>;
   inventory: CropInventory[];
   onOpenChat: (item: CropInventory) => void;
+  onLockPrice: (item: CropInventory) => Promise<void>;
   authToken: string;
 }
 
@@ -479,18 +480,26 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
               return <p className="text-sm text-gray-400">No active listings yet.</p>;
             }
             return items.map((item) => (
-              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-3xl border border-gray-100 p-4">
+              <div key={item.id} className="flex flex-col gap-3 rounded-3xl border border-gray-100 p-4">
                 <div>
                   <p className="text-sm font-black">{item.cropName}</p>
                   <p className="text-[11px] text-gray-500 font-semibold">{item.location.name}</p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => onOpenChat(item)}
                     className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full"
                   >
                     Open Chat
                   </button>
+                  {item.listingType === 'BIDDING' && (
+                    <button
+                      onClick={() => onLockPrice(item)}
+                      className="bg-white text-black text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-gray-200"
+                    >
+                      Lock Price (KES {item.currentBid})
+                    </button>
+                  )}
                   {unreadById[item.id] ? (
                     <span className="bg-green-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full">
                       {unreadById[item.id]}

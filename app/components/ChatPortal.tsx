@@ -117,7 +117,9 @@ const ChatPortal: React.FC<ChatPortalProps> = ({ currentUser, connectedWith, aut
         </div>
         <div className="text-left sm:text-right">
           <p className="text-xs text-gray-400 uppercase font-bold tracking-widest">Escrow Total</p>
-          <p className="font-bold text-green-400 text-lg">KES {connectedWith.currentBid * connectedWith.quantity}</p>
+          <p className="font-bold text-green-400 text-lg">
+            KES {connectedWith.currentBid * (requestedQuantity || connectedWith.quantity)}
+          </p>
           {requestedQuantity ? (
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
               Requested: {requestedQuantity} Kg

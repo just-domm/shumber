@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from ..core.deps import get_current_user, get_db
 from ..models import Inventory, InventoryStatus, User, UserRole
-from ..schemas import CropInventoryCreate, CropInventoryOut, HeatPoint, Location
+from ..schemas import BidCreate, CropInventoryCreate, CropInventoryOut, HeatPoint, InventoryUpdate, Location
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -128,3 +128,87 @@ def heatmap_points(
         )
 
     return results
+
+
+@router.post("/{inventory_id}/bid", response_model=CropInventoryOut)
+def place_bid(
+    inventory_id: str,
+    payload: BidCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.role != UserRole.BUYER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only buyers can place bids")
+
+    item = db.query(Inventory).filter(Inventory.id == inventory_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory not found")
+    if item.listing_type != "BIDDING":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Listing is not open for bidding")
+    if payload.amount <= item.current_bid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bid must exceed current price")
+
+    item.current_bid = payload.amount
+    item.highest_bidder_id = user.id
+    item.status = InventoryStatus.NEGOTIATING
+    db.commit()
+    db.refresh(item)
+
+    return CropInventoryOut(
+        id=item.id,
+        farmer_id=item.farmer_id,
+        farmer_name=item.farmer_name,
+        crop_name=item.crop_name,
+        quantity=item.quantity,
+        quality_score=item.quality_score,
+        base_price=item.base_price,
+        current_bid=item.current_bid,
+        highest_bidder_id=item.highest_bidder_id,
+        location=Location(name=item.location_name, lat=item.location_lat, lng=item.location_lng),
+        image_url=item.image_url,
+        timestamp=item.timestamp,
+        status=item.status,
+        listing_type=item.listing_type,
+    )
+
+
+@router.patch("/{inventory_id}", response_model=CropInventoryOut)
+def update_inventory(
+    inventory_id: str,
+    payload: InventoryUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.role != UserRole.FARMER:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only farmers can update inventory")
+
+    item = db.query(Inventory).filter(Inventory.id == inventory_id).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory not found")
+    if item.farmer_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your inventory listing")
+
+    if payload.current_bid is not None:
+        item.current_bid = payload.current_bid
+    if payload.listing_type is not None:
+        item.listing_type = payload.listing_type
+
+    db.commit()
+    db.refresh(item)
+
+    return CropInventoryOut(
+        id=item.id,
+        farmer_id=item.farmer_id,
+        farmer_name=item.farmer_name,
+        crop_name=item.crop_name,
+        quantity=item.quantity,
+        quality_score=item.quality_score,
+        base_price=item.base_price,
+        current_bid=item.current_bid,
+        highest_bidder_id=item.highest_bidder_id,
+        location=Location(name=item.location_name, lat=item.location_lat, lng=item.location_lng),
+        image_url=item.image_url,
+        timestamp=item.timestamp,
+        status=item.status,
+        listing_type=item.listing_type,
+    )

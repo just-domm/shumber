@@ -132,6 +132,45 @@ export const createInventory = async (
   return mapInventory(data);
 };
 
+export const placeBid = async (inventoryId: string, token: string, amount: number): Promise<CropInventory> => {
+  const res = await fetch(`${API_BASE}/inventory/${inventoryId}/bid`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ amount })
+  });
+  if (!res.ok) {
+    throw new Error('Failed to place bid');
+  }
+  const data = await res.json();
+  return mapInventory(data);
+};
+
+export const updateInventory = async (
+  inventoryId: string,
+  token: string,
+  payload: { currentBid?: number; listingType?: 'BIDDING' | 'FIXED' }
+): Promise<CropInventory> => {
+  const body: Record<string, unknown> = {};
+  if (payload.currentBid !== undefined) body.current_bid = payload.currentBid;
+  if (payload.listingType !== undefined) body.listing_type = payload.listingType;
+  const res = await fetch(`${API_BASE}/inventory/${inventoryId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    throw new Error('Failed to update inventory');
+  }
+  const data = await res.json();
+  return mapInventory(data);
+};
+
 export const analyzeProduceQuality = async (imageBase64: string): Promise<AnalysisResult> => {
   const res = await fetch(`${API_BASE}/analysis`, {
     method: 'POST',

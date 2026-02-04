@@ -10,7 +10,9 @@ import {
   storeToken,
   getStoredToken,
   clearToken,
-  startEscrow
+  startEscrow,
+  placeBid,
+  updateInventory
 } from '@/services/api';
 import HeatMap from '@/app/components/HeatMap';
 import ChatPortal from '@/app/components/ChatPortal';
@@ -35,6 +37,7 @@ const App: React.FC = () => {
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
   const [escrow, setEscrow] = useState<Escrow | null>(null);
   const [requestQuantity, setRequestQuantity] = useState<string>('');
+  const [bidAmount, setBidAmount] = useState<string>('');
   const [pendingRoute, setPendingRoute] = useState<AppRoute | null>(null);
   const [pendingCropId, setPendingCropId] = useState<string | null>(null);
   const [pendingRole, setPendingRole] = useState<UserRole | null>(null);
@@ -244,7 +247,16 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!selectedCrop) return;
     setRequestQuantity('');
+    setBidAmount('');
   }, [selectedCrop]);
+
+  useEffect(() => {
+    if (!selectedCrop) return;
+    const updated = inventory.find((item) => item.id === selectedCrop.id);
+    if (updated) {
+      setSelectedCrop(updated);
+    }
+  }, [inventory, selectedCrop]);
 
   useEffect(() => {
     if (!selectedCrop) return;
@@ -328,6 +340,49 @@ const App: React.FC = () => {
       console.error('Failed to create inventory', error);
       showToast('Posting failed. Please ensure the backend is running.', 'error');
       return null;
+    }
+  };
+
+  const handlePlaceBid = async (item: CropInventory) => {
+    if (!authToken) {
+      showToast('Please log in as a buyer to place a bid.', 'error');
+      return;
+    }
+    const amount = parseInt(bidAmount, 10);
+    if (!amount || amount <= item.currentBid) {
+      showToast('Bid must be higher than the current price.', 'error');
+      return;
+    }
+    try {
+      const updated = await placeBid(item.id, authToken, amount);
+      setInventory((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
+      setSelectedCrop(updated);
+      showToast('Bid submitted!', 'success');
+      setBidAmount('');
+    } catch (error) {
+      console.error('Failed to place bid', error);
+      showToast('Bid failed. Please retry.', 'error');
+    }
+  };
+
+  const handleLockPrice = async (item: CropInventory) => {
+    if (!authToken) {
+      showToast('Please log in as a farmer to lock a price.', 'error');
+      return;
+    }
+    try {
+      const updated = await updateInventory(item.id, authToken, {
+        currentBid: item.currentBid,
+        listingType: 'FIXED'
+      });
+      setInventory((prev) => prev.map((inv) => (inv.id === updated.id ? updated : inv)));
+      if (selectedCrop?.id === updated.id) {
+        setSelectedCrop(updated);
+      }
+      showToast('Price locked.', 'success');
+    } catch (error) {
+      console.error('Failed to lock price', error);
+      showToast('Unable to lock price.', 'error');
     }
   };
 
@@ -617,6 +672,7 @@ const App: React.FC = () => {
                   setSelectedCrop(item);
                   setRoute(AppRoute.NEGOTIATION);
                 }}
+                onLockPrice={handleLockPrice}
               />
             ) : (
               <div className="h-full flex items-center justify-center p-10">
@@ -749,6 +805,28 @@ const App: React.FC = () => {
                            Estimated total: KES {selectedCrop.currentBid * Math.max(1, Math.min(selectedCrop.quantity, parseInt(requestQuantity || `${selectedCrop.quantity}`, 10)))}
                          </p>
                        </div>
+
+                       {selectedCrop.listingType === 'BIDDING' && (
+                         <div className="bg-white border border-gray-200 rounded-3xl p-5 mb-8">
+                           <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-2">Place Bid (KES per Kg)</p>
+                           <div className="flex items-center space-x-3">
+                             <input
+                               type="number"
+                               min={selectedCrop.currentBid + 1}
+                               value={bidAmount}
+                               onChange={(e) => setBidAmount(e.target.value)}
+                               placeholder={`Min KES ${selectedCrop.currentBid + 1}`}
+                               className="flex-1 bg-gray-100 border border-gray-200 rounded-2xl p-4 font-bold focus:ring-2 focus:ring-black outline-none"
+                             />
+                             <button
+                               onClick={() => handlePlaceBid(selectedCrop)}
+                               className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-full"
+                             >
+                               Bid
+                             </button>
+                           </div>
+                         </div>
+                       )}
 
                        <div className="fixed bottom-0 left-0 right-0 lg:static lg:mt-auto">
                          <div className="lg:hidden bg-white/90 backdrop-blur border-t border-gray-100 px-6 py-4">

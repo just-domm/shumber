@@ -132,6 +132,15 @@ class EscrowStart(BaseModel):
     amount: Optional[int] = None
 
 
+class BidCreate(BaseModel):
+    amount: int = Field(gt=0)
+
+
+class InventoryUpdate(BaseModel):
+    current_bid: Optional[int] = Field(default=None, gt=0)
+    listing_type: Optional[ListingType] = None
+
+
 class EscrowOut(BaseModel):
     id: str
     inventory_id: str

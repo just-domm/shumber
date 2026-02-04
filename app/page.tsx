@@ -40,7 +40,6 @@ const App: React.FC = () => {
   const [bidAmount, setBidAmount] = useState<string>('');
   const [pendingRoute, setPendingRoute] = useState<AppRoute | null>(null);
   const [pendingCropId, setPendingCropId] = useState<string | null>(null);
-  const [pendingRole, setPendingRole] = useState<UserRole | null>(null);
   const [pendingRegion, setPendingRegion] = useState<string | null>(null);
   const [pendingQuantity, setPendingQuantity] = useState<string | null>(null);
   const [pendingCropSnapshot, setPendingCropSnapshot] = useState<string | null>(null);
@@ -111,11 +110,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('shumber_user_role', userRole);
-  }, [userRole]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
     if (drillDownRegion) {
       localStorage.setItem('shumber_region', drillDownRegion);
     } else {
@@ -159,7 +153,6 @@ const App: React.FC = () => {
     const storedRoute = localStorage.getItem('shumber_route') as AppRoute | null;
     const storedCropId = localStorage.getItem('shumber_selected_crop_id');
     const storedCropSnapshot = localStorage.getItem('shumber_selected_crop_snapshot');
-    const storedRole = localStorage.getItem('shumber_user_role') as UserRole | null;
     const storedRegion = localStorage.getItem('shumber_region');
     const storedQuantity = localStorage.getItem('shumber_request_quantity');
     if (storedRoute) {
@@ -167,9 +160,6 @@ const App: React.FC = () => {
     }
     if (storedCropId) {
       setPendingCropId(storedCropId);
-    }
-    if (storedRole) {
-      setPendingRole(storedRole);
     }
     if (storedRegion) {
       setPendingRegion(storedRegion);
@@ -205,9 +195,6 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (pendingRole) {
-      setUserRole(pendingRole);
-    }
     if (pendingRegion) {
       setDrillDownRegion(pendingRegion);
     }
@@ -218,7 +205,6 @@ const App: React.FC = () => {
       if (pendingRoute && pendingRoute === AppRoute.MARKETPLACE) {
         setRoute(pendingRoute);
       }
-      setPendingRole(null);
       setPendingRegion(null);
       setPendingQuantity(null);
       setPendingRoute(null);
@@ -239,11 +225,10 @@ const App: React.FC = () => {
     }
     setPendingCropId(null);
     setPendingRoute(null);
-    setPendingRole(null);
     setPendingRegion(null);
     setPendingQuantity(null);
     setPendingCropSnapshot(null);
-  }, [inventory, pendingCropId, pendingRoute, pendingRole, pendingRegion, pendingQuantity, pendingCropSnapshot]);
+  }, [inventory, pendingCropId, pendingRoute, pendingRegion, pendingQuantity, pendingCropSnapshot]);
 
   useEffect(() => {
     if (!selectedCrop) {
@@ -324,7 +309,6 @@ const App: React.FC = () => {
       localStorage.removeItem('shumber_route');
       localStorage.removeItem('shumber_selected_crop_id');
       localStorage.removeItem('shumber_selected_crop_snapshot');
-      localStorage.removeItem('shumber_user_role');
       localStorage.removeItem('shumber_region');
       localStorage.removeItem('shumber_request_quantity');
     }
@@ -490,22 +474,6 @@ const App: React.FC = () => {
                 {authError}
               </span>
             )}
-            <button 
-              onClick={() => {
-                if (!authUser) {
-                  showToast('Please log in to switch roles.', 'error');
-                  return;
-                }
-                if (userRole === UserRole.BUYER && authUser.role !== UserRole.FARMER) {
-                  showToast('This account is not a farmer.', 'error');
-                  return;
-                }
-                setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER);
-              }}
-              className="bg-gray-800 hover:bg-gray-700 text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-3 sm:px-4 py-2 rounded-full border border-gray-700 transition-colors"
-            >
-              Switch to {userRole === UserRole.BUYER ? 'Farmer' : 'Buyer'} View
-            </button>
             <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full border-2 border-green-800 overflow-hidden shadow-inner">
                <img src={`https://ui-avatars.com/api/?name=${user.name}&background=000&color=fff&bold=true`} alt="User" />
             </div>
@@ -557,23 +525,6 @@ const App: React.FC = () => {
                 Logout
               </button>
             )}
-            <button 
-              onClick={() => {
-                if (!authUser) {
-                  showToast('Please log in to switch roles.', 'error');
-                  return;
-                }
-                if (userRole === UserRole.BUYER && authUser.role !== UserRole.FARMER) {
-                  showToast('This account is not a farmer.', 'error');
-                  return;
-                }
-                setUserRole(userRole === UserRole.BUYER ? UserRole.FARMER : UserRole.BUYER);
-                setIsNavOpen(false);
-              }}
-              className="w-full bg-gray-800 hover:bg-gray-700 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full border border-gray-700 transition-colors"
-            >
-              Switch to {userRole === UserRole.BUYER ? 'Farmer' : 'Buyer'} View
-            </button>
           </div>
         )}
       </nav>

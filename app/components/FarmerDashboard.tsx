@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { NAKURU_LOCATIONS } from '@/constants';
 import { analyzeProduceQuality, fetchMessages, parseOfflineMessage } from '@/services/api';
 import { User, CropInventory, AnalysisResult, CropInventoryCreate } from '@/app/types/types';
+import HeatMap from '@/app/components/HeatMap';
 
 interface FarmerDashboardProps {
   user: User;
@@ -27,10 +28,13 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<DashboardAnalysis | null>(null);
   const [quantity, setQuantity] = useState<string>('');
+  const [basePriceInput, setBasePriceInput] = useState<string>('');
+  const [suggestedPrice, setSuggestedPrice] = useState<number | null>(null);
   const [locationName, setLocationName] = useState(NAKURU_LOCATIONS[0].name);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [listingType, setListingType] = useState<'BIDDING' | 'FIXED'>('BIDDING');
   const [unreadById, setUnreadById] = useState<Record<string, number>>({});
+  const [messageCountById, setMessageCountById] = useState<Record<string, number>>({});
 
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -61,9 +65,11 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
       }
       try {
         const updates: Record<string, number> = {};
+        const counts: Record<string, number> = {};
         await Promise.all(
           owned.map(async (item) => {
             const messages = await fetchMessages(item.id, authToken);
+            counts[item.id] = messages.length;
             const lastSeen = localStorage.getItem(`shumber_last_seen_${item.id}`);
             const unread = messages.filter(
               (msg) =>
@@ -74,6 +80,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
           })
         );
         setUnreadById(updates);
+        setMessageCountById(counts);
       } catch (error) {
         console.error('Failed to load unread counts', error);
       }
@@ -85,6 +92,17 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
       if (timer) window.clearInterval(timer);
     };
   }, [authToken, inventory, user.id]);
+
+  useEffect(() => {
+    if (!analysis) {
+      setSuggestedPrice(null);
+      setBasePriceInput('');
+      return;
+    }
+    const suggestion = Math.max(1, Math.round(analysis.freshnessScore * 0.6));
+    setSuggestedPrice(suggestion);
+    setBasePriceInput(`${suggestion}`);
+  }, [analysis]);
 
   const startCamera = async () => {
     try {
@@ -214,7 +232,12 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
   const handleSubmit = async () => {
     if (!analysis || !quantity) return;
     const location = NAKURU_LOCATIONS.find((l) => l.name === locationName) || NAKURU_LOCATIONS[0];
-    const basePrice = Math.round(analysis.freshnessScore * 0.6);
+    const parsedPrice = parseInt(basePriceInput, 10);
+    if (!parsedPrice || parsedPrice <= 0) {
+      toast('Please set a valid price per Kg.', 'error');
+      return;
+    }
+    const basePrice = parsedPrice;
 
     const newItem: CropInventoryCreate = {
       cropName: analysis.cropName,
@@ -232,6 +255,8 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
       setPreview(null);
       setAnalysis(null);
       setQuantity('');
+      setBasePriceInput('');
+      setSuggestedPrice(null);
       setListingType('BIDDING');
       setAudioBase64(null);
       setVoiceText('');
@@ -407,6 +432,20 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                     </select>
                   </div>
                 </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase">Your Price (KES per Kg)</label>
+                  <input
+                    type="number"
+                    value={basePriceInput}
+                    onChange={(e) => setBasePriceInput(e.target.value)}
+                    className="w-full bg-gray-100 p-4 rounded-2xl font-bold border-none"
+                  />
+                  {suggestedPrice ? (
+                    <p className="text-[10px] text-gray-400 font-semibold">
+                      Suggested starting price: KES {suggestedPrice}
+                    </p>
+                  ) : null}
+                </div>
                 <div className="space-y-6">
                   <div className="space-y-3">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Selling Mode</p>
@@ -480,7 +519,10 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
             if (items.length === 0) {
               return <p className="text-sm text-gray-400">No active listings yet.</p>;
             }
-            return items.map((item) => (
+            return items.map((item) => {
+              const messageCount = messageCountById[item.id] || 0;
+              const hasMessages = messageCount > 0;
+              return (
               <div key={item.id} className="flex flex-col gap-3 rounded-3xl border border-gray-100 p-4">
                 <div>
                   <p className="text-sm font-black">{item.cropName}</p>
@@ -489,9 +531,10 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => onOpenChat(item)}
-                    className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full"
+                    disabled={!hasMessages}
+                    className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full disabled:opacity-40"
                   >
-                    Open Chat
+                    {hasMessages ? 'Open Chat' : 'No Requests Yet'}
                   </button>
                   {item.listingType === 'BIDDING' && (
                     <button
@@ -508,8 +551,27 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                   ) : null}
                 </div>
               </div>
-            ));
+            );
+            });
           })()}
+        </div>
+      </div>
+
+      <div className="bg-white p-6 sm:p-7 md:p-8 rounded-[32px] md:rounded-[40px] uber-shadow border border-gray-100 mt-6 md:mt-8">
+        <header className="mb-6">
+          <h3 className="text-2xl font-black tracking-tighter text-black">Market Heatmap</h3>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            Read-only view for active listings.
+          </p>
+        </header>
+        <div className="relative h-[320px] rounded-3xl overflow-hidden border border-gray-100">
+          <HeatMap
+            inventory={inventory}
+            onSelectCrop={() => {}}
+            onRegionSelect={() => {}}
+            defaultCenter={[NAKURU_LOCATIONS[8].lat, NAKURU_LOCATIONS[8].lng]}
+            defaultZoom={11}
+          />
         </div>
       </div>
 

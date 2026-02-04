@@ -19,6 +19,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
   onCreateInventory,
   inventory,
   onOpenChat,
+  onLockPrice,
   authToken
 }) => {
   const [activeTab, setActiveTab] = useState<'PHOTO' | 'VOICE'>('PHOTO');

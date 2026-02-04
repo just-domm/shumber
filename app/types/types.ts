@@ -59,6 +59,8 @@ export interface Escrow {
   inventoryId: string;
   buyerId: string;
   amount: number;
+  platformFee: number;
+  payoutAmount: number;
   requestedQuantity?: number;
   status: EscrowStatus;
   createdAt: string;

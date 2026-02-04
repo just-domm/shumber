@@ -41,6 +41,8 @@ const mapEscrow = (item: any): Escrow => ({
   inventoryId: item.inventory_id ?? item.inventoryId,
   buyerId: item.buyer_id ?? item.buyerId,
   amount: item.amount,
+  platformFee: item.platform_fee ?? item.platformFee ?? 0,
+  payoutAmount: item.payout_amount ?? item.payoutAmount ?? item.amount,
   requestedQuantity: item.requested_quantity ?? item.requestedQuantity ?? undefined,
   status: item.status,
   createdAt: item.created_at ?? item.createdAt,

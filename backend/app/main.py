@@ -51,6 +51,12 @@ def on_startup() -> None:
                     "ADD COLUMN IF NOT EXISTS requested_quantity INTEGER"
                 )
             )
+            connection.execute(
+                text(
+                    "ALTER TABLE escrow "
+                    "ADD COLUMN IF NOT EXISTS platform_fee INTEGER DEFAULT 0"
+                )
+            )
     with SessionLocal() as db:
         seed_data(db)
 

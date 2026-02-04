@@ -148,6 +148,8 @@ class EscrowOut(BaseModel):
     inventory_id: str
     buyer_id: str
     amount: int
+    platform_fee: int
+    payout_amount: int
     requested_quantity: Optional[int] = None
     status: EscrowStatus
     created_at: datetime

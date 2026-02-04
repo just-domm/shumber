@@ -13,6 +13,9 @@ interface EscrowPortalProps {
 const EscrowPortal: React.FC<EscrowPortalProps> = ({ item, authToken, escrow, onRelease }) => {
   const [step, setStep] = useState<'INITIAL' | 'SCANNING' | 'CONFIRMED'>('INITIAL');
   const [isWorking, setIsWorking] = useState(false);
+  const grossAmount = escrow?.amount ?? item.currentBid * (escrow?.requestedQuantity ?? item.quantity);
+  const platformFee = escrow?.platformFee ?? Math.max(Math.round(grossAmount * 0.02), 0);
+  const payoutAmount = escrow?.payoutAmount ?? Math.max(grossAmount - platformFee, 0);
   const toast = (message: string, tone: 'info' | 'success' | 'error' = 'info') => {
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('shumber-toast', { detail: { message, tone } }));
@@ -97,8 +100,12 @@ const EscrowPortal: React.FC<EscrowPortalProps> = ({ item, authToken, escrow, on
             <div>
               <h2 className="text-xl md:text-2xl font-black text-green-700">Produce Verified</h2>
               <p className="text-gray-500 mt-2 text-sm">
-                Quality matches Gemini score of {item.qualityScore}%. Authorized to release KES {escrow?.amount ?? item.currentBid * item.quantity}.
+                Quality matches Gemini score of {item.qualityScore}%. Authorized to release KES {payoutAmount}.
               </p>
+              <div className="mt-3 text-[11px] text-gray-400 font-semibold uppercase tracking-widest space-y-1">
+                <p>Platform fee (2%): KES {platformFee}</p>
+                <p>Gross amount: KES {grossAmount}</p>
+              </div>
               {escrow?.requestedQuantity ? (
                 <p className="text-xs text-gray-400 mt-2 font-semibold uppercase tracking-widest">
                   Quantity locked: {escrow.requestedQuantity} Kg

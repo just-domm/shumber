@@ -327,7 +327,6 @@ const App: React.FC = () => {
       }
       const created = await createInventory(authToken, payload);
       setInventory((prev) => [created, ...prev]);
-      setUserRole(UserRole.BUYER);
       setRoute(AppRoute.MARKETPLACE);
       setNotification({ show: true, type: 'ACCEPTED' });
       setTimeout(() => setNotification(null), 2000);

@@ -529,13 +529,20 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                   <p className="text-[11px] text-gray-500 font-semibold">{item.location.name}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => onOpenChat(item)}
-                    disabled={!hasMessages}
-                    className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full disabled:opacity-40"
-                  >
-                    {hasMessages ? 'Open Chat' : 'No Requests Yet'}
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => onOpenChat(item)}
+                      disabled={!hasMessages}
+                      className="bg-black text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full disabled:opacity-40"
+                    >
+                      {hasMessages ? 'Open Chat' : 'No Requests Yet'}
+                    </button>
+                    {unreadById[item.id] ? (
+                      <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-green-600 text-white text-[9px] font-black uppercase tracking-widest flex items-center justify-center">
+                        {unreadById[item.id]}
+                      </span>
+                    ) : null}
+                  </div>
                   {item.listingType === 'BIDDING' && (
                     <button
                       onClick={() => onLockPrice(item)}
@@ -544,9 +551,9 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({
                       Lock Price (KES {item.currentBid})
                     </button>
                   )}
-                  {unreadById[item.id] ? (
-                    <span className="bg-green-600 text-white text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full">
-                      {unreadById[item.id]}
+                  {messageCountById[item.id] ? (
+                    <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                      {messageCountById[item.id]} msgs
                     </span>
                   ) : null}
                 </div>

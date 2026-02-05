@@ -3,7 +3,7 @@ import React from 'react';
 
 const EscrowTermsPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-50 px-4 sm:px-8 md:px-12 py-10">
+    <div className="flex-1 px-4 sm:px-8 md:px-12 py-10">
       <div className="max-w-3xl mx-auto bg-white border border-gray-100 rounded-[32px] p-6 sm:p-8 md:p-10 uber-shadow">
         <div className="mb-6">
           <p className="text-[10px] font-black uppercase tracking-widest text-green-600 mb-2">Escrow</p>

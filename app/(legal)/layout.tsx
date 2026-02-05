@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-y-auto">
       <nav className="bg-black text-white px-4 md:px-8 py-4 md:py-5 flex items-center justify-between shadow-2xl">
         <a href="/" className="flex items-center space-x-3">
           <div className="bg-white text-black px-2.5 py-1 rounded-md font-black text-2xl italic tracking-tighter shadow-lg">

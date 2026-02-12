@@ -30,11 +30,15 @@ const HeatMap: React.FC<HeatMapProps> = ({
   useEffect(() => {
     const loadAssets = async () => {
       if (!document.getElementById('leaflet-css')) {
-        const link = document.createElement('link');
-        link.id = 'leaflet-css';
-        link.rel = 'stylesheet';
-        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-        document.head.appendChild(link);
+        await new Promise((r) => {
+          const link = document.createElement('link');
+          link.id = 'leaflet-css';
+          link.rel = 'stylesheet';
+          link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+          link.onload = r;
+          link.onerror = r;
+          document.head.appendChild(link);
+        });
       }
       if (!(window as any).L) {
         await new Promise((r) => {
@@ -66,6 +70,8 @@ const HeatMap: React.FC<HeatMapProps> = ({
 
     const L = (window as any).L;
     let resizeObserver: ResizeObserver | null = null;
+    let scheduleInvalidate: (() => void) | null = null;
+    let handleVisibility: (() => void) | null = null;
 
     try {
       mapRef.current = L.map(mapContainerRef.current, {
@@ -95,9 +101,22 @@ const HeatMap: React.FC<HeatMapProps> = ({
         maxZoom: 19
       }).addTo(mapRef.current);
 
-      setTimeout(() => {
-        if (mapRef.current) mapRef.current.invalidateSize();
-      }, 400);
+      scheduleInvalidate = () => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize();
+        }
+      };
+      window.setTimeout(scheduleInvalidate, 50);
+      window.setTimeout(scheduleInvalidate, 400);
+      window.setTimeout(scheduleInvalidate, 1200);
+
+      handleVisibility = () => {
+        if (document.visibilityState === 'visible' && scheduleInvalidate) {
+          scheduleInvalidate();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
+      window.addEventListener('resize', scheduleInvalidate);
 
       resizeObserver = new ResizeObserver((entries) => {
         const entry = entries[0];
@@ -148,6 +167,18 @@ const HeatMap: React.FC<HeatMapProps> = ({
     }
 
     return () => {
+      if (handleVisibility) {
+        document.removeEventListener('visibilitychange', handleVisibility);
+      }
+      if (scheduleInvalidate) {
+        window.removeEventListener('resize', scheduleInvalidate);
+      }
+      if (heatLayerRef.current) {
+        heatLayerRef.current.remove();
+        heatLayerRef.current = null;
+      }
+      markersRef.current.forEach((m) => m.remove());
+      markersRef.current = [];
       if (resizeObserver) resizeObserver.disconnect();
       if (mapRef.current) {
         mapRef.current.remove();
@@ -159,6 +190,7 @@ const HeatMap: React.FC<HeatMapProps> = ({
   useEffect(() => {
     const L = (window as any).L;
     if (!mapRef.current || !L || !libReady || !mapContainerRef.current) return;
+    if (!(mapRef.current as any)._loaded) return;
     const size = mapRef.current.getSize();
     if (size.x === 0 || size.y === 0) {
       window.setTimeout(() => {

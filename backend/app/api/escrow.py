@@ -6,6 +6,11 @@ from ..models import Escrow, EscrowStatus, Inventory, InventoryStatus, User, Use
 from ..schemas import EscrowOut, EscrowStart
 
 router = APIRouter(prefix="/escrow", tags=["escrow"])
+PLATFORM_FEE_RATE = 0.02
+
+
+def _calculate_platform_fee(amount: int) -> int:
+    return max(int(round(amount * PLATFORM_FEE_RATE)), 0)
 
 
 def _get_inventory(db: Session, inventory_id: str) -> Inventory:
@@ -38,12 +43,20 @@ def start_escrow(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only buyers can start escrow")
     item = _get_inventory(db, inventory_id)
 
-    amount = payload.amount or int(item.current_bid * item.quantity)
+    requested_quantity = payload.quantity or item.quantity
+    if requested_quantity > item.quantity:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Requested quantity exceeds available stock"
+        )
+    amount = payload.amount or int(item.current_bid * requested_quantity)
+    platform_fee = _calculate_platform_fee(amount)
     item.status = InventoryStatus.NEGOTIATING
 
     existing = db.query(Escrow).filter(Escrow.inventory_id == inventory_id).first()
     if existing:
         existing.amount = amount
+        existing.platform_fee = platform_fee
+        existing.requested_quantity = requested_quantity
         existing.buyer_id = user.id
         existing.status = EscrowStatus.PENDING
         db.commit()
@@ -54,6 +67,8 @@ def start_escrow(
         inventory_id=inventory_id,
         buyer_id=user.id,
         amount=amount,
+        platform_fee=platform_fee,
+        requested_quantity=requested_quantity,
         status=EscrowStatus.PENDING,
     )
     db.add(escrow)
@@ -83,9 +98,13 @@ def release_escrow(
 ):
     escrow = _get_escrow(db, inventory_id)
     escrow.status = EscrowStatus.RELEASED
+    escrow.platform_fee = _calculate_platform_fee(escrow.amount)
 
     item = _get_inventory(db, inventory_id)
-    item.status = InventoryStatus.SOLD
+    requested_quantity = escrow.requested_quantity or item.quantity
+    remaining = max(item.quantity - requested_quantity, 0)
+    item.quantity = remaining
+    item.status = InventoryStatus.SOLD if remaining == 0 else InventoryStatus.AVAILABLE
 
     db.commit()
     db.refresh(escrow)

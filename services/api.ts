@@ -1,6 +1,14 @@
-import { AnalysisResult, CropInventory, CropInventoryCreate, Escrow, Message, User } from '@/app/types/types';
+import {
+  AnalysisResult,
+  CropInventory,
+  CropInventoryCreate,
+  Escrow,
+  Message,
+  OfflineParseResult,
+  User
+} from '@/app/types/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
 const TOKEN_KEY = 'shamba_token';
 
 const mapInventory = (item: any): CropInventory => ({
@@ -23,6 +31,7 @@ const mapInventory = (item: any): CropInventory => ({
 const mapMessage = (item: any): Message => ({
   id: item.id,
   senderId: item.sender_id ?? item.senderId,
+  senderName: item.sender_name ?? item.senderName,
   text: item.text,
   timestamp: item.timestamp
 });
@@ -32,6 +41,9 @@ const mapEscrow = (item: any): Escrow => ({
   inventoryId: item.inventory_id ?? item.inventoryId,
   buyerId: item.buyer_id ?? item.buyerId,
   amount: item.amount,
+  platformFee: item.platform_fee ?? item.platformFee ?? 0,
+  payoutAmount: item.payout_amount ?? item.payoutAmount ?? item.amount,
+  requestedQuantity: item.requested_quantity ?? item.requestedQuantity ?? undefined,
   status: item.status,
   createdAt: item.created_at ?? item.createdAt,
   updatedAt: item.updated_at ?? item.updatedAt
@@ -124,6 +136,45 @@ export const createInventory = async (
   return mapInventory(data);
 };
 
+export const placeBid = async (inventoryId: string, token: string, amount: number): Promise<CropInventory> => {
+  const res = await fetch(`${API_BASE}/inventory/${inventoryId}/bid`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ amount })
+  });
+  if (!res.ok) {
+    throw new Error('Failed to place bid');
+  }
+  const data = await res.json();
+  return mapInventory(data);
+};
+
+export const updateInventory = async (
+  inventoryId: string,
+  token: string,
+  payload: { currentBid?: number; listingType?: 'BIDDING' | 'FIXED' }
+): Promise<CropInventory> => {
+  const body: Record<string, unknown> = {};
+  if (payload.currentBid !== undefined) body.current_bid = payload.currentBid;
+  if (payload.listingType !== undefined) body.listing_type = payload.listingType;
+  const res = await fetch(`${API_BASE}/inventory/${inventoryId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    throw new Error('Failed to update inventory');
+  }
+  const data = await res.json();
+  return mapInventory(data);
+};
+
 export const analyzeProduceQuality = async (imageBase64: string): Promise<AnalysisResult> => {
   const res = await fetch(`${API_BASE}/analysis`, {
     method: 'POST',
@@ -133,6 +184,26 @@ export const analyzeProduceQuality = async (imageBase64: string): Promise<Analys
 
   if (!res.ok) {
     throw new Error('Analysis failed');
+  }
+
+  return res.json();
+};
+
+export const parseOfflineMessage = async (payload: {
+  text?: string;
+  audioBase64?: string;
+}): Promise<OfflineParseResult> => {
+  const res = await fetch(`${API_BASE}/analysis/offline`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      text: payload.text,
+      audio_base64: payload.audioBase64
+    })
+  });
+
+  if (!res.ok) {
+    throw new Error('Offline parsing failed');
   }
 
   return res.json();
@@ -173,7 +244,8 @@ export const sendMessage = async (
 export const startEscrow = async (
   inventoryId: string,
   token: string,
-  amount?: number
+  amount?: number,
+  quantity?: number
 ): Promise<Escrow> => {
   const res = await fetch(`${API_BASE}/escrow/${inventoryId}/start`, {
     method: 'POST',
@@ -181,7 +253,7 @@ export const startEscrow = async (
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ amount })
+    body: JSON.stringify({ amount, quantity })
   });
   if (!res.ok) {
     let detail = 'Failed to start escrow';

@@ -35,11 +35,11 @@ const BuyerDashboard: React.FC<BuyerDashboardProps> = ({ user, inventory, onPlac
   };
 
   return (
-    <div className="grid lg:grid-cols-3 gap-6 p-4 md:p-8">
+    <div className="grid lg:grid-cols-3 gap-6 p-4 sm:p-6 md:p-8">
       <div className="lg:col-span-2 space-y-6">
-        <div className="bg-white p-4 rounded-xl uber-shadow border border-gray-100">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Nakuru Surplus Map</h2>
+        <div className="bg-white p-4 sm:p-5 rounded-xl uber-shadow border border-gray-100">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">Nakuru Surplus Map</h2>
             <div className="flex space-x-4 text-xs font-medium">
               <span className="flex items-center"><div className="w-3 h-3 bg-red-500 rounded-full mr-1"></div> Surplus</span>
               <span className="flex items-center"><div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div> High Demand</span>
@@ -83,7 +83,7 @@ const BuyerDashboard: React.FC<BuyerDashboardProps> = ({ user, inventory, onPlac
       </div>
 
       <div className="space-y-6">
-        <div className="bg-white p-6 rounded-xl uber-shadow border border-gray-100 h-fit sticky top-24">
+        <div className="bg-white p-5 sm:p-6 rounded-xl uber-shadow border border-gray-100 h-fit sticky top-24">
           {selectedCrop ? (
             <div className="animate-fadeIn">
               <div className="flex justify-between items-start mb-4">

@@ -89,6 +89,12 @@ class Escrow(Base):
     inventory_id: Mapped[str] = mapped_column(String, ForeignKey("inventory.id"), nullable=False, unique=True)
     buyer_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    platform_fee: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    requested_quantity: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[EscrowStatus] = mapped_column(Enum(EscrowStatus), default=EscrowStatus.PENDING)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    @property
+    def payout_amount(self) -> int:
+        return max(self.amount - (self.platform_fee or 0), 0)

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from .models import EscrowStatus, InventoryStatus, ListingType, UserRole
 
@@ -95,6 +95,24 @@ class AnalysisResult(BaseModel):
     marketInsight: str
 
 
+class OfflineParseRequest(BaseModel):
+    text: Optional[str] = None
+    audio_base64: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_payload(self):
+        if not self.text and not self.audio_base64:
+            raise ValueError("Provide text or audio_base64 for offline parsing.")
+        return self
+
+
+class OfflineParseResult(BaseModel):
+    cropName: str
+    quantity: float
+    locationName: str
+    farmerName: Optional[str] = None
+
+
 class MessageCreate(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
 
@@ -105,6 +123,7 @@ class MessageOut(BaseModel):
     sender_id: str
     text: str
     timestamp: datetime
+    sender_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -112,6 +131,16 @@ class MessageOut(BaseModel):
 
 class EscrowStart(BaseModel):
     amount: Optional[int] = None
+    quantity: Optional[int] = Field(default=None, gt=0)
+
+
+class BidCreate(BaseModel):
+    amount: int = Field(gt=0)
+
+
+class InventoryUpdate(BaseModel):
+    current_bid: Optional[int] = Field(default=None, gt=0)
+    listing_type: Optional[ListingType] = None
 
 
 class EscrowOut(BaseModel):
@@ -119,6 +148,9 @@ class EscrowOut(BaseModel):
     inventory_id: str
     buyer_id: str
     amount: int
+    platform_fee: int
+    payout_amount: int
+    requested_quantity: Optional[int] = None
     status: EscrowStatus
     created_at: datetime
     updated_at: datetime

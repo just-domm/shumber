@@ -47,6 +47,7 @@ export interface CropInventoryCreate {
 export interface Message {
   id: string;
   senderId: string;
+  senderName?: string;
   text: string;
   timestamp: string;
 }
@@ -58,6 +59,9 @@ export interface Escrow {
   inventoryId: string;
   buyerId: string;
   amount: number;
+  platformFee: number;
+  payoutAmount: number;
+  requestedQuantity?: number;
   status: EscrowStatus;
   createdAt: string;
   updatedAt: string;
@@ -68,6 +72,13 @@ export interface AnalysisResult {
   freshnessScore: number;
   estimatedShelfLife: string;
   marketInsight: string;
+}
+
+export interface OfflineParseResult {
+  cropName: string;
+  quantity: number;
+  locationName: string;
+  farmerName?: string;
 }
 
 export enum UserRole {
